@@ -1,0 +1,16 @@
+# FRAMEWORK WEB (Sustituye a Streamlit)
+Flask
+gunicorn             # Servidor web necesario para ejecutar Flask en Render
+
+# AUTENTICACIÓN ESTÁNDAR (Sustituye a streamlit-oauth)
+requests-oauthlib    # Librería estándar de Python para manejar flujos OAuth 2.0
+PyJWT                # Necesaria para manejar tokens JWT (como el id_token de Google)
+
+# DEPENDENCIAS DE GOOGLE SHEETS / CONEXIÓN
+gspread
+google-auth
+
+# DEPENDENCIAS DE PROCESAMIENTO DE DATOS (Se mantienen)
+pandas
+matplotlib
+Pillow
