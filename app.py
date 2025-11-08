@@ -28,6 +28,14 @@ REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", DEFAULT_REDIRECT).strip()
 if REDIRECT_URI.endswith("/"):
     REDIRECT_URI = REDIRECT_URI[:-1]
 
+# --- 🧩 Diagnóstico de entorno ---
+print("\n========== DEBUG ENVIRONMENT VARIABLES ==========")
+print(f"OAUTH_CLIENT_ID: {'CARGADO ✅' if CLIENT_ID else 'NO CARGADO ❌'}")
+print(f"OAUTH_CLIENT_SECRET: {'CARGADO ✅' if CLIENT_SECRET else 'NO CARGADO ❌'}")
+print(f"FLASK_SECRET_KEY: {'CARGADA ✅' if FLASK_SECRET_KEY else 'NO CARGADA ❌'}")
+print(f"OAUTH_REDIRECT_URI: {REDIRECT_URI}")
+print("=================================================\n")
+
 # URLs estándar de Google OAuth
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -122,19 +130,4 @@ def oauth2callback():
     except Exception as e:
         app.logger.error(f"❌ Error en callback OAuth: {e}")
         app.logger.error(f"🔍 URL recibida: {request.url}")
-        return f"<h3>Error procesando callback: {e}</h3>", 500
-
-# ==============================
-# 6. CERRAR SESIÓN
-# ==============================
-@app.route('/logout')
-def logout():
-    session.clear()
-    app.logger.info("👋 Sesión cerrada.")
-    return redirect(url_for('home'))
-
-# ==============================
-# 7. PUNTO DE ENTRADA
-# ==============================
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+        return f"<h
