@@ -48,17 +48,27 @@ BUTTON_COLOR = "#1034A6"
 # OAuth constants
 # app.py (Código Flask para Render)
 from flask import Flask, redirect, url_for, session, request, render_template_string
-import os, base64, json
 from requests_oauthlib import OAuth2Session
 from datetime import timedelta
+import os, base64, json
+import logging
+# Necesario para decodificación de JWT (aunque no se use para la validación de firma final)
+import jwt 
+
+# Configuración del logging
+logging.basicConfig(level=logging.INFO)
 
 # --- 1. CONFIGURACIÓN DE LA APLICACIÓN Y SECRETOS ---
-# NOTA: En Render, estas variables se configuran como Environment Variables.
-# Las leeremos desde variables de entorno.
+
+# NOTA: Estas variables se leen desde las variables de entorno de Render
 CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
-REDIRECT_URI = "https://www.tripcounter.online/oauth2callback" # Render usa tu dominio final
-# OAUTH URLS
+FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
+
+# Esta variable se añade para flexibilidad y se lee desde Render
+REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://www.tripcounter.online/oauth2callback")
+
+# URLs Estándar de Google
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = ["openid", "email", "profile"]
@@ -210,20 +220,22 @@ def oauth2callback():
     return redirect(url_for('index'))
 
 app = Flask(__name__)
-# Necesitas una clave secreta para gestionar las sesiones de Flask
-# **IMPORTANTE**: Cámbiala en Render por un valor largo y aleatorio.
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "TU_CLAVE_SECRETA_POR_DEFECTO")
+
+# Configuración de seguridad para la sesión de Flask
+if not FLASK_SECRET_KEY:
+    raise RuntimeError("La variable de entorno FLASK_SECRET_KEY no está configurada.")
+app.secret_key = FLASK_SECRET_KEY
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
 
 
-# --- 2. RUTAS DE INTERFAZ (Reemplazando st.XXX) ---
+# --- 2. RUTAS DE INTERFAZ ---
 
 @app.route('/')
 def home():
-    # Verifica si el usuario está autenticado
+    """Ruta principal que muestra la interfaz de la aplicación o el botón de login."""
     if 'email' in session:
         user_email = session['email']
-        # --- CÓDIGO DE LA APLICACIÓN PRINCIPAL (AQUÍ DEBE IR TU LÓGICA DE TRIPS) ---
+        # --- CÓDIGO DE LA APLICACIÓN PRINCIPAL (Contenido Autenticado) ---
         return render_template_string("""
             <h1>Bienvenido a Trip Counter, {{ email }}</h1>
             <p>Aquí irá toda la lógica de tus pestañas (Uber/Didi, Gastos, etc.), reescrita sin Streamlit.</p>
@@ -231,10 +243,9 @@ def home():
         """, email=user_email)
     else:
         # Página de inicio de sesión
-        # ESTILOS: DEBES CREAR UN ARCHIVO CSS SEPARADO PARA TU IMAGEN DE FONDO
         return render_template_string("""
             <h1>Inicia Sesión para Acceder a Trip Counter</h1>
-            <a href="/login"><button>Iniciar Sesión con Google</button></a>
+            <a href="/login"><button style="padding: 10px; background-color: #1034A6; color: white; border-radius: 5px;">Iniciar Sesión con Google</button></a>
             <p>Lee nuestra <a href="https://policy.tripcounter.online" target="_blank">Política de Privacidad</a>.</p>
         """)
 
@@ -242,36 +253,40 @@ def home():
 
 @app.route('/login')
 def login():
-    # 1. Crea la sesión OAuth
+    """Inicia el flujo de autenticación de Google OAuth."""
     google = OAuth2Session(CLIENT_ID, scope=SCOPE, redirect_uri=REDIRECT_URI)
-    # 2. Genera la URL de autorización de Google
-    authorization_url, state = google.authorization_url(AUTHORIZE_URL, access_type="offline", prompt="select_account")
+    
+    authorization_url, state = google.authorization_url(
+        AUTHORIZE_URL, 
+        access_type="offline", 
+        prompt="select_account"
+    )
     session['oauth_state'] = state
-    # 3. Redirige al usuario a Google
+    
     return redirect(authorization_url)
 
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    # 1. Recupera la sesión OAuth
-    google = OAuth2Session(CLIENT_ID, state=session['oauth_state'], redirect_uri=REDIRECT_URI)
+    """Maneja la respuesta de Google y obtiene el token de acceso."""
+    google = OAuth2Session(CLIENT_ID, state=session.get('oauth_state'), redirect_uri=REDIRECT_URI)
     
     try:
-        # 2. Obtiene el token usando el código de la URL
-        token = google.fetch_token(TOKEN_URL, client_secret=CLIENT_SECRET, 
-                                   authorization_response=request.url)
+        token = google.fetch_token(
+            TOKEN_URL, 
+            client_secret=CLIENT_SECRET, 
+            authorization_response=request.url
+        )
         
-        # 3. Obtiene la información del usuario (requiere decodificación del ID token)
         id_token_jwt = token.get('id_token')
         if id_token_jwt:
-            # El token JWT debe ser decodificado para obtener la info (email, etc.)
-            import jwt
-            # Google usa un formato específico para su JWKS (clave pública).
-            # Para este ejemplo, solo decodificaremos la carga útil.
-            # En producción, ¡DEBES validar el token usando las claves públicas de Google!
+            # Decodificación simple del payload (para fines de prueba)
+            payload_base64 = id_token_jwt.split('.')[1]
+            # Añade padding si es necesario
+            padding = len(payload_base64) % 4
+            payload_base64 += "=" * (4 - padding if padding else 0)
             
-            # Decodificación simple del payload para fines de prueba (NO SEGURO PARA PRODUCCIÓN)
-            payload = json.loads(base64.b64decode(id_token_jwt.split('.')[1] + '==').decode())
+            payload = json.loads(base64.urlsafe_b64decode(payload_base64).decode())
             
             session['email'] = payload.get('email')
             session['token'] = token
@@ -280,10 +295,11 @@ def oauth2callback():
         
     except Exception as e:
         app.logger.error(f"Error en OAuth callback: {e}")
-        return "Fallo de autenticación. Inténtalo de nuevo.", 400
+        return f"Fallo de autenticación (Error interno). Inténtalo de nuevo. Detalle: {e}", 500
 
 @app.route('/logout')
 def logout():
+    """Cierra la sesión del usuario."""
     session.clear()
 
     return redirect(url_for('index'))
