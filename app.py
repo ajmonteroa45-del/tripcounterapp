@@ -3,12 +3,15 @@
 from flask import Flask, redirect, url_for, session, request, render_template_string
 from requests_oauthlib import OAuth2Session
 from datetime import timedelta
-import os, logging, jwt, json
+import os, logging, jwt, json, sys
 
 # ==============================
 # 1. CONFIGURACIÓN DE LOGGING
 # ==============================
 logging.basicConfig(level=logging.INFO)
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+logging.getLogger("requests_oauthlib").setLevel(logging.DEBUG)
+logging.getLogger("urllib3").setLevel(logging.DEBUG)
 
 # ==============================
 # 2. VARIABLES DE ENTORNO
@@ -16,7 +19,14 @@ logging.basicConfig(level=logging.INFO)
 CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
-REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://tripcounter.online/oauth2callback")
+
+# --- 🔍 Ajuste automático de REDIRECT_URI según el dominio ---
+DEFAULT_REDIRECT = "https://tripcounter.online/oauth2callback"
+REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", DEFAULT_REDIRECT).strip()
+
+# Limpieza automática de valores mal formateados
+if REDIRECT_URI.endswith("/"):
+    REDIRECT_URI = REDIRECT_URI[:-1]
 
 # URLs estándar de Google OAuth
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -29,12 +39,11 @@ SCOPE = ["openid", "email", "profile"]
 app = Flask(__name__)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
 
-# Manejo robusto de la clave secreta
 if not FLASK_SECRET_KEY:
     FLASK_SECRET_KEY = os.urandom(24)
-    app.logger.warning("⚠️ Variable de entorno FLASK_SECRET_KEY no encontrada. Se usará una clave temporal.")
+    app.logger.warning("⚠️ Variable FLASK_SECRET_KEY no encontrada. Se usará una clave temporal.")
 else:
-    app.logger.info("✅ FLASK_SECRET_KEY cargada correctamente desde el entorno.")
+    app.logger.info("✅ FLASK_SECRET_KEY cargada correctamente.")
 
 app.secret_key = FLASK_SECRET_KEY
 
@@ -43,14 +52,12 @@ app.secret_key = FLASK_SECRET_KEY
 # ==============================
 @app.route('/')
 def home():
-    """Ruta principal que muestra la interfaz de la aplicación o el botón de login."""
     if 'email' in session:
-        user_email = session['email']
         return render_template_string("""
             <h1>Bienvenido a Trip Counter, {{ email }}</h1>
-            <p>Aquí irá toda la lógica de tus pestañas (Uber/Didi, Gastos, etc.).</p>
+            <p>Panel principal (Uber, Didi, Gastos, etc.)</p>
             <a href="/logout"><button>Cerrar Sesión</button></a>
-        """, email=user_email)
+        """, email=session['email'])
     else:
         return render_template_string("""
             <h1>Inicia Sesión para Acceder a Trip Counter</h1>
@@ -67,8 +74,11 @@ def home():
 # ==============================
 @app.route('/login')
 def login():
-    """Inicia el flujo de autenticación de Google OAuth."""
     app.logger.info(f"🔁 Iniciando login con redirect_uri: {REDIRECT_URI}")
+
+    if not CLIENT_ID or not CLIENT_SECRET:
+        app.logger.error("❌ CLIENT_ID o CLIENT_SECRET no están configurados.")
+        return "<h3>Error: Faltan credenciales OAuth.</h3>", 500
 
     try:
         google = OAuth2Session(CLIENT_ID, scope=SCOPE, redirect_uri=REDIRECT_URI)
@@ -78,21 +88,20 @@ def login():
             prompt="select_account"
         )
         session['oauth_state'] = state
-        app.logger.info(f"🌐 Redirigiendo a URL de autorización: {authorization_url}")
+        app.logger.info(f"🌐 URL de autorización generada: {authorization_url}")
         return redirect(authorization_url)
     except Exception as e:
-        app.logger.error(f"❌ Error iniciando sesión: {str(e)}")
+        app.logger.error(f"❌ Error al iniciar sesión: {e}")
         return f"<h3>Error iniciando sesión: {e}</h3>", 500
 
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    """Maneja la respuesta de Google y obtiene el token de acceso."""
     app.logger.info("🔁 Recibiendo callback de Google OAuth")
 
     if 'error' in request.args:
         error = request.args.get('error')
-        app.logger.error(f"⚠️ Error devuelto por Google: {error}")
+        app.logger.error(f"⚠️ Google devolvió un error: {error}")
         return f"<h3>Error devuelto por Google: {error}</h3>", 400
 
     try:
@@ -104,7 +113,6 @@ def oauth2callback():
         )
         session['oauth_token'] = token
 
-        # Obtener información del usuario
         user_info = google.get('https://www.googleapis.com/oauth2/v2/userinfo').json()
         session['email'] = user_info.get('email')
 
@@ -112,7 +120,8 @@ def oauth2callback():
         return redirect(url_for('home'))
 
     except Exception as e:
-        app.logger.error(f"❌ Error en el callback OAuth: {str(e)}")
+        app.logger.error(f"❌ Error en callback OAuth: {e}")
+        app.logger.error(f"🔍 URL recibida: {request.url}")
         return f"<h3>Error procesando callback: {e}</h3>", 500
 
 # ==============================
@@ -121,7 +130,7 @@ def oauth2callback():
 @app.route('/logout')
 def logout():
     session.clear()
-    app.logger.info("👋 Sesión cerrada correctamente.")
+    app.logger.info("👋 Sesión cerrada.")
     return redirect(url_for('home'))
 
 # ==============================
