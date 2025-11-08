@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
-REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://www.tripcounter.online/oauth2callback")
+REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://tripcounter.online/oauth2callback")
 
 # --- 3. URLs ESTÁNDAR DE GOOGLE ---
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
