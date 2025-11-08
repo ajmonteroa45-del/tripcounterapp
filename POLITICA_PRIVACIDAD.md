@@ -1,7 +1,7 @@
 # Poloticas de privacidad TripCounter-V2 #
 Esta política es específica para una aplicación de backend que utiliza una Cuenta de Servicio.
-​[Nombre de la Aplicación]: TripCounter-V2
-https://TripCounter.online/
+​[Nombre de la Aplicación]: TripCounterapp
+https://ajmonteroa45-del.github.io/tripcounterapp/
 [Fecha de Vigencia]: 2 de noviembre de 2025
 ​Resumen de Recopilación de Datos
 ​Esta Política de Privacidad describe cómo la aplicación TripCounter-V2 (en adelante, "la Aplicación") recopila, utiliza y protege la información al interactuar con las API de Google, específicamente Google Sheets y Google Drive.
