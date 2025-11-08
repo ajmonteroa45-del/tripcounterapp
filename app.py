@@ -4,8 +4,7 @@ from requests_oauthlib import OAuth2Session
 from datetime import timedelta
 import os, base64, json
 import logging
-# Necesario para decodificación de JWT (aunque no se use para la validación de firma final)
-import jwt 
+import jwt  # Necesario para decodificación de JWT (aunque no se use para la validación de firma final)
 
 # Configuración del logging
 logging.basicConfig(level=logging.INFO)
@@ -28,11 +27,14 @@ SCOPE = ["openid", "email", "profile"]
 app = Flask(__name__)
 
 # Configuración de seguridad para la sesión de Flask
+# Puedes descomentar el print para verificar si Render ve la variable:
+# print(">>> FLASK_SECRET_KEY =", os.environ.get("FLASK_SECRET_KEY"))
+
 if not FLASK_SECRET_KEY:
     raise RuntimeError("La variable de entorno FLASK_SECRET_KEY no está configurada.")
+
 app.secret_key = FLASK_SECRET_KEY
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
-
 
 # --- 2. RUTAS DE INTERFAZ ---
 
@@ -110,7 +112,7 @@ def logout():
     return redirect(url_for('home'))
 
 
+# --- 4. EJECUCIÓN LOCAL (Render usa Gunicorn) ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=os.environ.get('PORT', 5000), debug=True)
-    # Usamos Gunicorn para producción en Render, pero Flask para desarrollo local
+    # Solo se usa en desarrollo local, Render usará gunicorn app:app
     app.run(host='0.0.0.0', port=os.environ.get('PORT', 5000), debug=True)
