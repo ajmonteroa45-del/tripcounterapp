@@ -130,4 +130,19 @@ def oauth2callback():
     except Exception as e:
         app.logger.error(f"❌ Error en callback OAuth: {e}")
         app.logger.error(f"🔍 URL recibida: {request.url}")
-        return f"<h
+        return f"<h3>Error procesando callback: {e}</h3>", 500
+
+# ==============================
+# 6. CERRAR SESIÓN
+# ==============================
+@app.route('/logout')
+def logout():
+    session.clear()
+    app.logger.info("👋 Sesión cerrada.")
+    return redirect(url_for('home'))
+
+# ==============================
+# 7. PUNTO DE ENTRADA
+# ==============================
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
