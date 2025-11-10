@@ -1,7 +1,5 @@
 services:
   - type: web
-    name: trackerapp
+    name: tripcounterapp
     env: docker
     plan: free
-    dockerfilePath: Dockerfile
-    startCommand: ""
