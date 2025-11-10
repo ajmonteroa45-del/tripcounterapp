@@ -1,17 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card">
   <h2>Panel principal</h2>
-  <p>Bienvenido{% if email %}, <strong>{{ email }}</strong>{% endif %}. Elige una sección:</p>
-  <div class="grid">
-    <a class="card-link" href="{{ url_for('trips') }}">Registrar viajes</a>
-    <a class="card-link" href="{{ url_for('extras') }}">Viajes extra</a>
-    <a class="card-link" href="{{ url_for('gastos') }}">Gastos</a>
-    <a class="card-link" href="{{ url_for('kilometraje') }}">Kilometraje / Generar resumen</a>
-    <a class="card-link" href="{{ url_for('resumenes') }}">Resúmenes</a>
-    <a class="card-link" href="{{ url_for('imagenes') }}">Imágenes</a>
-    <a class="card-link" href="{{ url_for('exportar') }}">Exportar / Descargar</a>
-    <a class="card-link" href="{{ url_for('budget') }}">Presupuesto</a>
-  </div>
-</div>
+  <p>Bienvenido, <strong>{{ email }}</strong>. Elige una sección:</p>
+
+  <nav class="nav-links">
+    <a href="{{ url_for('viajes_page') }}">Registrar viajes</a>
+    <a href="{{ url_for('extras_page') }}">Viajes extra</a>
+    <a href="{{ url_for('presupuesto_page') }}">Presupuesto</a>
+    <a href="{{ url_for('index') }}">Resúmenes</a>
+  </nav>
+
+  {% if reminders %}
+    <section class="card">
+      <h3>Recordatorios</h3>
+      <ul>
+        {% for r in reminders %}
+          <li>
+            {% if r.type == '3days' %}En 3 días: {% elif r.type == 'due' %}Hoy vence: {% endif %}
+            <strong>{{ r.categoria }}</strong> — {{ r.monto }}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
 {% endblock %}
