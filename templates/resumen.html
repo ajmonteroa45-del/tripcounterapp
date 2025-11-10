@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Resúmenes</h3>
+  {% if files %}
+    <ul>
+      {% for f in files %}
+        <li><a href="{{ url_for('view_summary', filename=f) }}">{{ f }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No hay resúmenes guardados.</p>
+  {% endif %}
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}

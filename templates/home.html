@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Panel principal</h2>
+  <p>Bienvenido{% if email %}, <strong>{{ email }}</strong>{% endif %}. Elige una sección:</p>
+  <div class="grid">
+    <a class="card-link" href="{{ url_for('trips') }}">Registrar viajes</a>
+    <a class="card-link" href="{{ url_for('extras') }}">Viajes extra</a>
+    <a class="card-link" href="{{ url_for('gastos') }}">Gastos</a>
+    <a class="card-link" href="{{ url_for('kilometraje') }}">Kilometraje / Generar resumen</a>
+    <a class="card-link" href="{{ url_for('resumenes') }}">Resúmenes</a>
+    <a class="card-link" href="{{ url_for('imagenes') }}">Imágenes</a>
+    <a class="card-link" href="{{ url_for('exportar') }}">Exportar / Descargar</a>
+    <a class="card-link" href="{{ url_for('budget') }}">Presupuesto</a>
+  </div>
+</div>
+{% endblock %}

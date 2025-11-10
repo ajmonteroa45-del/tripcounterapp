@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or "Trip Counter" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="left">
+      <h1 class="brand">🚗 {{ title or "Trip Counter" }}</h1>
+      <div class="subtitle">{{ subtitle or "" }}</div>
+    </div>
+    <div class="right">
+      {% if email %}
+        <span class="email">{{ email }}</span>
+        <a class="btn" href="{{ url_for('logout') }}">Cerrar sesión</a>
+      {% else %}
+        <a class="btn" href="{{ url_for('login') }}">Iniciar sesión</a>
+      {% endif %}
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <small>Trip Counter • Hecho por Al3xy</small>
+  </footer>
+</body>
+</html>

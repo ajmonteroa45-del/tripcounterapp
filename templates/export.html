@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Exportar</h3>
+  {% if csv_exists %}
+    <p><a class="btn" href="{{ url_for('download_csv') }}">📥 Descargar CSV de viajes</a></p>
+  {% else %}
+    <p>No hay registro de viajes.</p>
+  {% endif %}
+  {% if gastos_exists %}
+    <p><a class="btn" href="{{ url_for('download_gastos') }}">📥 Descargar CSV de gastos</a></p>
+  {% endif %}
+  <p><a class="btn" href="{{ url_for('clear_all') }}">Vaciar todos los registros</a></p>
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}

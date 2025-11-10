@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Imágenes</h3>
+  {% if imgs %}
+    <ul>
+      {% for im in imgs %}
+        <li><a href="{{ url_for('download_image', filename=im) }}">{{ im }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No hay imágenes.</p>
+  {% endif %}
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}

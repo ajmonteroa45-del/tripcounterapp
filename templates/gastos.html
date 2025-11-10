@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Registrar Viaje Extra</h3>
+  {% if message %}
+    <div class="msg {{ message.type }}">{{ message.text }}</div>
+  {% endif %}
+  <form method="post" class="form-grid">
+    <label>Hora inicio <input name="hi" class="input"></label>
+    <label>Hora fin <input name="hf" class="input"></label>
+    <label>Ganancia S/ <input name="gan" class="input" type="number" step="0.01"></label>
+    <label>Propina S/ <input name="prop" class="input" type="number" step="0.01"></label>
+    <label><input type="checkbox" name="aer"> Aeropuerto (+S/6.50)</label>
+    <div><button class="btn" type="submit">Agregar viaje extra</button></div>
+  </form>
+</div>
+<div class="card">
+  <h4>Viajes extra de hoy</h4>
+  {{ table | safe }}
+  <a href="{{ url_for('index') }}" class="btn">Volver</a>
+</div>
+{% endblock %}

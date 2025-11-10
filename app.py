@@ -46,29 +46,6 @@ os.makedirs(BASE_DIR, exist_ok=True)
 BUTTON_COLOR = "#1034A6"
 
 # OAuth constants
-# app.py (Código Flask para Render)
-from flask import Flask, redirect, url_for, session, request, render_template_string
-from requests_oauthlib import OAuth2Session
-from datetime import timedelta
-import os, base64, json
-import logging
-# Necesario para decodificación de JWT (aunque no se use para la validación de firma final)
-import jwt 
-
-# Configuración del logging
-logging.basicConfig(level=logging.INFO)
-
-# --- 1. CONFIGURACIÓN DE LA APLICACIÓN Y SECRETOS ---
-
-# NOTA: Estas variables se leen desde las variables de entorno de Render
-CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
-CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
-FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
-
-# Esta variable se añade para flexibilidad y se lee desde Render
-REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://www.tripcounter.online/oauth2callback")
-
-# URLs Estándar de Google
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = ["openid", "email", "profile"]
@@ -221,85 +198,149 @@ def oauth2callback():
 
 app = Flask(__name__)
 
-# Configuración de seguridad para la sesión de Flask
-if not FLASK_SECRET_KEY:
-    raise RuntimeError("La variable de entorno FLASK_SECRET_KEY no está configurada.")
-app.secret_key = FLASK_SECRET_KEY
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
+def user_csv_path(alias_email: str) -> str:
+    return os.path.join(BASE_DIR, f"{safe_alias_from_email(alias_email)}.csv")
 
+def user_gastos_path(alias_email: str) -> str:
+    return os.path.join(BASE_DIR, f"{safe_alias_from_email(alias_email)}_gastos.csv")
 
-# --- 2. RUTAS DE INTERFAZ ---
+def ensure_user_csv(alias_email: str) -> str:
+    path = user_csv_path(alias_email)
+    if not os.path.exists(path):
+        df = pd.DataFrame(columns=["fecha","tipo","viaje_num","hora_inicio","hora_fin","ganancia_base","aeropuerto","propina","total_viaje"])
+        df.to_csv(path, index=False)
+    return path
 
-@app.route('/')
-def home():
-    """Ruta principal que muestra la interfaz de la aplicación o el botón de login."""
-    if 'email' in session:
-        user_email = session['email']
-        # --- CÓDIGO DE LA APLICACIÓN PRINCIPAL (Contenido Autenticado) ---
-        return render_template_string("""
-            <h1>Bienvenido a Trip Counter, {{ email }}</h1>
-            <p>Aquí irá toda la lógica de tus pestañas (Uber/Didi, Gastos, etc.), reescrita sin Streamlit.</p>
-            <a href="/logout"><button>Cerrar Sesión</button></a>
-        """, email=user_email)
-    else:
-        # Página de inicio de sesión
-        return render_template_string("""
-            <h1>Inicia Sesión para Acceder a Trip Counter</h1>
-            <a href="/login"><button style="padding: 10px; background-color: #1034A6; color: white; border-radius: 5px;">Iniciar Sesión con Google</button></a>
-            <p>Lee nuestra <a href="https://policy.tripcounter.online" target="_blank">Política de Privacidad</a>.</p>
-        """)
+def ensure_gastos_csv(alias_email: str) -> str:
+    path = user_gastos_path(alias_email)
+    if not os.path.exists(path):
+        df = pd.DataFrame(columns=["fecha","concepto","monto"])
+        df.to_csv(path, index=False)
+    return path
 
-# --- 3. LÓGICA DE OAUTH ---
+def validate_time_string(t: str) -> bool:
+    if not isinstance(t, str) or t.strip() == "":
+        return False
+    t = t.strip()
+    if re.match(r'^[0-2]\d:[0-5]\d$', t):
+        hh = int(t.split(":")[0])
+        return 0 <= hh <= 23
+    return False
 
+def total_of_trips(rows) -> float:
+    return sum(float(r.get("total_viaje", 0)) for r in rows)
+
+# ---------- gspread (presupuesto) ----------
+def get_gspread_client_from_env():
+    if not GSPREAD_SERVICE_ACCOUNT_JSON:
+        raise RuntimeError("GSPREAD_SERVICE_ACCOUNT_JSON not set in env.")
+    try:
+        creds_dict = json.loads(GSPREAD_SERVICE_ACCOUNT_JSON)
+    except Exception:
+        # try replace escaped newlines
+        creds_dict = json.loads(GSPREAD_SERVICE_ACCOUNT_JSON.replace("\\n", "\n"))
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+    client = gspread.Client(auth=credentials)
+    client.session = None
+    return client
+
+def load_presupuesto_gs():
+    if not GSPREAD_PRESUPUESTO_SHEET_ID:
+        return pd.DataFrame(columns=["alias","categoria","monto","fecha_pago","pagado"])
+    client = get_gspread_client_from_env()
+    ws = client.open_by_key(GSPREAD_PRESUPUESTO_SHEET_ID).sheet1
+    rows = ws.get_all_records()
+    if not rows:
+        return pd.DataFrame(columns=["alias","categoria","monto","fecha_pago","pagado"])
+    df = pd.DataFrame(rows)
+    for col in ["alias","categoria","monto","fecha_pago","pagado"]:
+        if col not in df.columns:
+            df[col] = ""
+    return df[["alias","categoria","monto","fecha_pago","pagado"]]
+
+def save_presupuesto_gs(df: pd.DataFrame):
+    if not GSPREAD_PRESUPUESTO_SHEET_ID:
+        return
+    client = get_gspread_client_from_env()
+    ws = client.open_by_key(GSPREAD_PRESUPUESTO_SHEET_ID).sheet1
+    vals = [df.columns.values.tolist()] + df.fillna("").astype(str).values.tolist()
+    ws.clear()
+    ws.update(vals)
+
+# ---------- imagenes / gráficos ----------
+def generate_balance_image(rows, ingresos, gastos_total, combustible, neto, alias):
+    labels = ["Ingresos (S/)", "Gastos (S/)", "Combustible (S/)", "Balance (S/)"]
+    values = [round(float(ingresos),2), round(float(gastos_total),2), round(float(combustible),2), round(float(neto),2)]
+    fig, ax = plt.subplots(figsize=(8,4.2))
+    bars = ax.bar(labels, values, color=["#4da6ff", "#ff7f50", "#ff9f43", "#2ecc71"])
+    ax.set_title(f"Balance {date.today().strftime('%Y-%m-%d')} — {alias}")
+    top = max(values) if values else 1
+    for bar, val in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width()/2, val + top*0.02, f"{val}", ha="center", fontsize=9)
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png", bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    # overlay logos optionally
+    try:
+        base_img = Image.open(buf).convert("RGBA")
+        overlay = Image.new("RGBA", base_img.size)
+        logo_path = os.path.join(IMAGES_DIR, "logo_app.png")
+        uber_logo_path = os.path.join(IMAGES_DIR, "logo_uber.png")
+        if os.path.exists(logo_path):
+            logo = Image.open(logo_path).convert("RGBA")
+            w = int(base_img.width * 0.15)
+            logo = logo.resize((w, int(logo.height*(w/logo.width))))
+            overlay.paste(logo, (10,10), logo)
+        if os.path.exists(uber_logo_path):
+            ulogo = Image.open(uber_logo_path).convert("RGBA")
+            w = int(base_img.width * 0.12)
+            ulogo = ulogo.resize((w, int(ulogo.height*(w/ulogo.width))))
+            overlay.paste(ulogo, (base_img.width - w - 10, 10), ulogo)
+        combined = Image.alpha_composite(base_img, overlay)
+        out_buf = BytesIO()
+        combined.convert("RGB").save(out_buf, format="PNG")
+        out_buf.seek(0)
+        return out_buf
+    except Exception:
+        buf.seek(0)
+        return buf
+
+# ---------- OAuth endpoints ----------
 @app.route('/login')
 def login():
-    """Inicia el flujo de autenticación de Google OAuth."""
+    app.logger.info(f"🔁 Iniciando login con redirect_uri: {REDIRECT_URI}")
+    if not CLIENT_ID or not CLIENT_SECRET:
+        app.logger.error("❌ CLIENT_ID o CLIENT_SECRET no están configurados.")
+        return "<h3>Error: Faltan credenciales OAuth.</h3>", 500
     google = OAuth2Session(CLIENT_ID, scope=SCOPE, redirect_uri=REDIRECT_URI)
-    
-    authorization_url, state = google.authorization_url(
-        AUTHORIZE_URL, 
-        access_type="offline", 
-        prompt="select_account"
-    )
+    authorization_url, state = google.authorization_url(AUTHORIZE_URL, access_type="offline", prompt="select_account")
     session['oauth_state'] = state
-    
     return redirect(authorization_url)
-
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    """Maneja la respuesta de Google y obtiene el token de acceso."""
+    if 'error' in request.args:
+        return f"Google returned error: {request.args.get('error')}", 400
     google = OAuth2Session(CLIENT_ID, state=session.get('oauth_state'), redirect_uri=REDIRECT_URI)
-    
-    try:
-        token = google.fetch_token(
-            TOKEN_URL, 
-            client_secret=CLIENT_SECRET, 
-            authorization_response=request.url
-        )
-        
-        id_token_jwt = token.get('id_token')
-        if id_token_jwt:
-            # Decodificación simple del payload (para fines de prueba)
+    token = google.fetch_token(TOKEN_URL, client_secret=CLIENT_SECRET, authorization_response=request.url)
+    id_token_jwt = token.get('id_token')
+    if id_token_jwt:
+        try:
             payload_base64 = id_token_jwt.split('.')[1]
-            # Añade padding si es necesario
             padding = len(payload_base64) % 4
             payload_base64 += "=" * (4 - padding if padding else 0)
-            
             payload = json.loads(base64.urlsafe_b64decode(payload_base64).decode())
-            
             session['email'] = payload.get('email')
-            session['token'] = token
-            
-            return redirect(url_for('home'))
-        
-    except Exception as e:
-        app.logger.error(f"Error en OAuth callback: {e}")
-        return f"Fallo de autenticación (Error interno). Inténtalo de nuevo. Detalle: {e}", 500
+            session['oauth_token'] = token
+            app.logger.info(f"✅ Usuario autenticado: {session['email']}")
+        except Exception as e:
+            app.logger.error("Error decoding id_token: " + str(e))
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
-    """Cierra la sesión del usuario."""
     session.clear()
 
     return redirect(url_for('index'))
@@ -309,6 +350,8 @@ def logout():
 def index():
     email = session.get('email')
     return render_template('home.html', email=email, app_name="Trip Counter", button_color=BUTTON_COLOR)
+
+    return redirect(url_for('index'))
 
 @app.route('/trips', methods=['GET','POST'])
 def trips():
@@ -1085,4 +1128,5 @@ def budget():
 # ---------- Run ----------
 if __name__ == "__main__":
     # DEBUG should be False in production
+
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

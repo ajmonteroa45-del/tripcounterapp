@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Resumen</h3>
+  <pre>{{ data | tojson(indent=2, ensure_ascii=False) }}</pre>
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}

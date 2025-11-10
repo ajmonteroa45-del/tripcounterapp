@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Presupuesto</h3>
+  {% if message %}
+    <div class="msg {{ message.type }}">{{ message.text }}</div>
+  {% endif %}
+  {% for a in alerts %}
+    {% if a[0]=='warning' %}
+      <div class="msg success">🔔 {{ a[1] }}</div>
+    {% else %}
+      <div class="msg error">⚠️ {{ a[1] }}</div>
+    {% endif %}
+  {% endfor %}
+  <form method="post" class="form-grid">
+    <input type="hidden" name="action" value="add_cat">
+    <label>Nombre categoría <input name="cat_name" class="input"></label>
+    <label>Monto asignado S/ <input name="cat_amount" class="input" type="number" step="0.01"></label>
+    <label>Fecha de pago <input name="fecha_pago" class="input" type="date"></label>
+    <div><button class="btn" type="submit">Agregar categoría</button></div>
+  </form>
+  <h4>Categorías</h4>
+  {% if budgets %}
+    <ul>
+      {% for row in budgets %}
+        <li><strong>{{ row.categoria }}</strong> — Asignado: S/{{ row.monto }} — Fecha: {{ row.fecha_pago }} — Pagado: {{ row.pagado }}
+          <form method="post" style="display:inline">
+            <input type="hidden" name="action" value="mark_paid">
+            <input type="hidden" name="idx" value="{{ row.orig_index }}">
+            <button class="btn" type="submit">Marcar pagado</button>
+          </form>
+          <form method="post" style="display:inline">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="idx" value="{{ row.orig_index }}">
+            <button class="btn" type="submit">Eliminar</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No hay categorías.</p>
+  {% endif %}
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}

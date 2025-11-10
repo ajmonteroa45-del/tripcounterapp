@@ -1,0 +1,1 @@
+# Trip Counter - Paquete listo para desplegar\n\nSigue las instrucciones en el chat para configurar variables de entorno y desplegar en Render.\n

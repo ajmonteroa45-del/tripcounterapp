@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Resumen generado</h3>
+  <pre>{{ summary | tojson(indent=2, ensure_ascii=False) }}</pre>
+  <p><a class="btn" href="{{ url_for('download_csv') }}">📁 Descargar CSV</a>
+     <a class="btn" href="{{ url_for('download_image', filename=image) }}">🖼️ Descargar imagen</a></p>
+  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+</div>
+{% endblock %}
