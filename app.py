@@ -356,6 +356,10 @@ def exportar():
 @app.route("/healthz")
 def healthz():
     return "ok", 200
+# Ruta para la página de viajes extra (arregla el error de url_for('extras'))
+@app.route("/extras")
+def extras():
+    return render_template("extras.html")
 
 # ---- Run ----
 if __name__ == "__main__":
