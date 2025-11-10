@@ -1,22 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card">
-  <h3>Registrar Viaje</h3>
-  {% if message %}
-    <div class="msg {{ message.type }}">{{ message.text }}</div>
-  {% endif %}
-  <form method="post" class="form-grid">
-    <label>Hora inicio <input name="hi" class="input"></label>
-    <label>Hora fin <input name="hf" class="input"></label>
-    <label>Ganancia base S/ <input name="gan" class="input" type="number" step="0.01"></label>
-    <label>Propina S/ <input name="prop" class="input" type="number" step="0.01"></label>
-    <label><input type="checkbox" name="aer"> Aeropuerto (+S/6.50)</label>
-    <div><button class="btn" type="submit">Agregar viaje</button></div>
-  </form>
-</div>
-<div class="card">
-  <h4>Viajes de hoy</h4>
-  {{ table | safe }}
-  <a href="{{ url_for('index') }}" class="btn">Volver</a>
-</div>
+  <h2>Registrar viajes (Uber)</h2>
+  <section class="card">
+    <form id="trip-form">
+      <label>Fecha:
+        <input type="date" name="fecha" id="fecha" value="{{ (datetime.utcnow().date()).isoformat() }}">
+      </label>
+      <label>Hora inicio:
+        <input type="time" name="hora_inicio" id="hora_inicio" required>
+      </label>
+      <label>Hora fin:
+        <input type="time" name="hora_fin" id="hora_fin" required>
+      </label>
+      <label>Monto S/:
+        <input type="number" name="monto" id="monto" step="0.01" required>
+      </label>
+      <label>Propina S/:
+        <input type="number" name="propina" id="propina" step="0.01" value="0">
+      </label>
+      <label>
+        <input type="checkbox" name="aeropuerto" id="aeropuerto"> Viaje al aeropuerto (+ S/6.50)
+      </label>
+      <button type="submit" class="btn">Registrar viaje</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Viajes del día</h3>
+    <div id="trips-list">Cargando...</div>
+  </section>
 {% endblock %}
