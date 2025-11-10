@@ -1,22 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card">
-  <h3>Registrar Viaje Extra</h3>
-  {% if message %}
-    <div class="msg {{ message.type }}">{{ message.text }}</div>
-  {% endif %}
-  <form method="post" class="form-grid">
-    <label>Hora inicio <input name="hi" class="input"></label>
-    <label>Hora fin <input name="hf" class="input"></label>
-    <label>Ganancia S/ <input name="gan" class="input" type="number" step="0.01"></label>
-    <label>Propina S/ <input name="prop" class="input" type="number" step="0.01"></label>
-    <label><input type="checkbox" name="aer"> Aeropuerto (+S/6.50)</label>
-    <div><button class="btn" type="submit">Agregar viaje extra</button></div>
-  </form>
-</div>
-<div class="card">
-  <h4>Viajes extra de hoy</h4>
-  {{ table | safe }}
-  <a href="{{ url_for('index') }}" class="btn">Volver</a>
-</div>
+  <h2>Registrar viajes extra</h2>
+  <section class="card">
+    <form id="extra-form">
+      <label>Fecha:
+        <input type="date" name="fecha" id="fecha_extra" value="{{ (datetime.utcnow().date()).isoformat() }}">
+      </label>
+      <label>Hora inicio:
+        <input type="time" name="hora_inicio" id="hora_inicio_extra" required>
+      </label>
+      <label>Hora fin:
+        <input type="time" name="hora_fin" id="hora_fin_extra" required>
+      </label>
+      <label>Monto S/:
+        <input type="number" name="monto" id="monto_extra" step="0.01" required>
+      </label>
+      <button type="submit" class="btn">Registrar viaje extra</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Viajes extra del día</h3>
+    <div id="extras-list">Cargando...</div>
+  </section>
 {% endblock %}
