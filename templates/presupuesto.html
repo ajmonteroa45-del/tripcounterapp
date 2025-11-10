@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Presupuesto mensual</h2>
+  <section class="card">
+    <form id="budget-form">
+      <label>Categoria:
+        <input type="text" name="categoria" id="categoria" required>
+      </label>
+      <label>Monto (USD):
+        <input type="number" name="monto" id="monto_pres" step="0.01" required>
+      </label>
+      <label>Fecha de pago:
+        <input type="date" name="fecha_pago" id="fecha_pago" required>
+      </label>
+      <button type="submit" class="btn">Agregar categoría</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Categorías (Presupuesto)</h3>
+    <div id="budget-list">Cargando...</div>
+  </section>
+{% endblock %}
