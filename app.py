@@ -1,5 +1,12 @@
 # app.py - Trip Counter (Flask)
 import os
+
+print("DEBUG ENVIRONMENT:")
+for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
+    value = os.getenv(key)
+    print(f"{key}: {'✅ OK' if value else '❌ MISSING'}")
+    
+import os
 import json
 import logging
 from datetime import date, datetime
