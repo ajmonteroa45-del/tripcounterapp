@@ -1,12 +1,6 @@
-# app.py - Trip Counter (Flask)
-print("DEBUG:app.py ha iniciado correctamente")
-import os
+  
+print("DEBUG: app.py ha iniciado correctamente")
 
-print("DEBUG ENVIRONMENT:")
-for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
-    value = os.getenv(key)
-    print(f"{key}: {'✅ OK' if value else '❌ MISSING'}")
-    
 import os
 import json
 import logging
@@ -15,6 +9,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import service_account
 import gspread
+import base64
+from google.oauth2.service_account import Credentials
 
 # ----------------------------
 # CONFIG / LOGGING
@@ -314,5 +310,5 @@ def api_presupuesto():
 # Run
 # ----------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print("DEBUG: Flask app ejecutándose directamente")
+    app.run(host="0.0.0.0", port=10000, debug=True)
