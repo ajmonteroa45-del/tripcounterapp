@@ -17,6 +17,15 @@ from google.oauth2.service_account import Credentials
 # ----------------------------
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, static_folder="static", template_folder="templates")
+# ----------------------------
+# Debug inicial visible en Render logs
+# ----------------------------
+@app.before_first_request
+def startup_debug():
+    import os
+    print("⚙️ DEBUG desde Flask startup:")
+    for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
+        print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
 app.logger.setLevel(logging.INFO)
 
 # Environment variables (must be configured)
