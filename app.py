@@ -39,26 +39,35 @@ GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.g
 # Fixed airport fee
 AIRPORT_FEE = 6.50
 
-# ----------------------------
-# Helper: Google Sheets client
-# ----------------------------
-import os, base64, json, gspread
+import os
+import json
+import base64
+import gspread
 from google.oauth2.service_account import Credentials
 
 def get_gspread_client():
-    if not os.path.exists("tripcounter-service-account.json"):
-        encoded = os.environ.get("SERVICE_ACCOUNT_B64")
-        if not encoded:
-            raise FileNotFoundError("Service account JSON not found.")
-        decoded = base64.b64decode(encoded)
-        with open("tripcounter-service-account.json", "wb") as f:
-            f.write(decoded)
-    
-    creds = Credentials.from_service_account_file("tripcounter-service-account.json", scopes=[
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ])
-    client = gspread.authorize(creds)
+    """
+    Crea y devuelve el cliente gspread, leyendo las credenciales desde
+    una variable de entorno codificada en base64 (SERVICE_ACCOUNT_B64).
+    Si no existe, lanza un error claro.
+    """
+    b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
+
+    if not b64_credentials:
+        raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
+
+    # Decodificar el contenido base64 y guardarlo como archivo temporal
+    credentials_json = base64.b64decode(b64_credentials).decode("utf-8")
+    creds_dict = json.loads(credentials_json)
+
+    # Crear las credenciales con los permisos adecuados
+    credentials = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets", 
+                "https://www.googleapis.com/auth/drive"]
+    )
+
+    client = gspread.authorize(credentials)
     return client
 
 def get_gspread_client():
