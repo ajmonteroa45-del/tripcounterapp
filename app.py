@@ -58,6 +58,7 @@ def get_gspread_client():
 
     # Decodificar el contenido base64 y crear las credenciales
     credentials_json = base64.b64decode(b64_credentials).decode("utf-8")
+    print("DEBUG: len(b64_credentials) =", len(b64_credentials))
     creds_dict = json.loads(credentials_json)
 
     credentials = Credentials.from_service_account_info(
