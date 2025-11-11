@@ -17,6 +17,9 @@ from google.oauth2.service_account import Credentials
 # ----------------------------
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, static_folder="static", template_folder="templates")
+import sys
+app.logger.addHandler(logging.StreamHandler(sys.stdout))
+app.logger.setLevel(logging.DEBUG)
 app.logger.setLevel(logging.INFO)
 
 # Environment variables (must be configured)
