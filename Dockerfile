@@ -18,4 +18,4 @@ ENV PORT=10000
 EXPOSE 10000
 
 # Comando para ejecutar Flask (Render usa la variable $PORT automáticamente)
-CMD gunicorn -b 0.0.0.0:$PORT app:app
+CMD ["gunicorn", "app:app", "--log-level", "debug", "--capture-output", "--enable-stdio-inheritance"]
