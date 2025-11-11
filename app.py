@@ -47,58 +47,29 @@ from google.oauth2.service_account import Credentials
 
 def get_gspread_client():
     """
-    Crea y devuelve el cliente gspread, leyendo las credenciales desde
-    una variable de entorno codificada en base64 (SERVICE_ACCOUNT_B64).
-    Si no existe, lanza un error claro.
+    Crea y devuelve el cliente gspread leyendo las credenciales
+    desde una variable de entorno codificada en base64 (SERVICE_ACCOUNT_B64).
     """
     b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
-
-    print("DEBUG: SERVICE_ACCOUNT_B64 está presente:", bool(os.getenv("SERVICE_ACCOUNT_B64")))
+    print("DEBUG: SERVICE_ACCOUNT_B64 presente:", bool(b64_credentials))
 
     if not b64_credentials:
         raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
 
-    # Decodificar el contenido base64 y guardarlo como archivo temporal
+    # Decodificar el contenido base64 y crear las credenciales
     credentials_json = base64.b64decode(b64_credentials).decode("utf-8")
     creds_dict = json.loads(credentials_json)
 
-    # Crear las credenciales con los permisos adecuados
     credentials = Credentials.from_service_account_info(
         creds_dict,
-        scopes=["https://www.googleapis.com/auth/spreadsheets", 
-                "https://www.googleapis.com/auth/drive"]
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive.file"
+        ]
     )
 
     client = gspread.authorize(credentials)
     return client
-
-def get_gspread_client():
-    """
-    Returns a gspread client authorized with the service account JSON.
-    Expects a file named `tripcounter-service-account.json` (or SERVICE_ACCOUNT_FILE env var).
-    """
-    if not os.path.exists(SERVICE_ACCOUNT_FILE):
-        app.logger.error(f"Service account file not found at {SERVICE_ACCOUNT_FILE}")
-        raise FileNotFoundError("Service account JSON not found. Upload it as tripcounter-service-account.json")
-
-    creds = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=GSHEETS_SCOPES
-    )
-    client = gspread.authorize(creds)
-    return client
-
-def ensure_sheet_with_headers(client, spreadsheet_name, headers):
-    """
-    Opens spreadsheet by name. If first worksheet has no headers, write them.
-    Returns the worksheet object.
-    """
-    sh = client.open(spreadsheet_name)
-    ws = sh.sheet1
-    existing = ws.row_values(1)
-    if not existing or len(existing) < len(headers):
-        app.logger.info(f"Creating headers in {spreadsheet_name}: {headers}")
-        ws.insert_row(headers, 1)
-    return ws
 
 # ----------------------------
 # ROUTES: Auth
