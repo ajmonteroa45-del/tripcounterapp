@@ -1,4 +1,5 @@
 # app.py - Trip Counter (Flask)
+print("DEBUG:app.py ha iniciado correctamente")
 import os
 
 print("DEBUG ENVIRONMENT:")
