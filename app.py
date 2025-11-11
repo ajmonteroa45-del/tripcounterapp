@@ -53,6 +53,8 @@ def get_gspread_client():
     """
     b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
 
+    print("DEBUG: SERVICE_ACCOUNT_B64 está presente:", bool(os.getenv("SERVICE_ACCOUNT_B64")))
+
     if not b64_credentials:
         raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
 
