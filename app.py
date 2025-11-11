@@ -1,4 +1,4 @@
-  
+ # app.py - Trip Counter (Flask)
 print("DEBUG: app.py ha iniciado correctamente")
 
 import os
@@ -17,27 +17,12 @@ from google.oauth2.service_account import Credentials
 # ----------------------------
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, static_folder="static", template_folder="templates")
-# ----------------------------
-# Debug inicial visible en Render logs
-# ----------------------------
-@app.before_first_request
-# ----------------------------
-# Debug inicial visible en Render logs
-# ----------------------------
-@app.before_request
-def startup_debug():
-    import os
-    if not getattr(app, '_startup_debug_done', False):
-        print("⚙️ DEBUG desde Flask startup:")
-        for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
-            print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
-        app._startup_debug_done = True
 app.logger.setLevel(logging.INFO)
 
 # Environment variables (must be configured)
 CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
-REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI")  # e.g. https://tripcounter.online/oauth2callback
+REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI")
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
 SERVICE_ACCOUNT_FILE = os.environ.get("SERVICE_ACCOUNT_FILE", "tripcounter-service-account.json")
 
@@ -58,26 +43,29 @@ GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.g
 # Fixed airport fee
 AIRPORT_FEE = 6.50
 
-import os
-import json
-import base64
-import gspread
-from google.oauth2.service_account import Credentials
+# ----------------------------
+# Debug inicial visible en Render logs
+# ----------------------------
+@app.before_request
+def startup_debug():
+    """Imprime variables de entorno clave solo una vez."""
+    if not getattr(app, "_startup_debug_done", False):
+        print("⚙️ DEBUG desde Flask startup:")
+        for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
+            print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
+        app._startup_debug_done = True
 
+# ----------------------------
+# Google Sheets Client
+# ----------------------------
 def get_gspread_client():
-    """
-    Crea y devuelve el cliente gspread leyendo las credenciales
-    desde una variable de entorno codificada en base64 (SERVICE_ACCOUNT_B64).
-    """
     b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
     print("DEBUG: SERVICE_ACCOUNT_B64 presente:", bool(b64_credentials))
 
     if not b64_credentials:
         raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
 
-    # Decodificar el contenido base64 y crear las credenciales
     credentials_json = base64.b64decode(b64_credentials).decode("utf-8")
-    print("DEBUG: len(b64_credentials) =", len(b64_credentials))
     creds_dict = json.loads(credentials_json)
 
     credentials = Credentials.from_service_account_info(
