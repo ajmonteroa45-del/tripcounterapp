@@ -72,7 +72,7 @@ def get_gspread_client():
         creds_dict,
         scopes=[
             "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file"
+            "https://www.googleapis.com/auth/drive.file"8
         ]
     )
 
@@ -314,4 +314,4 @@ def api_presupuesto():
 # ----------------------------
 if __name__ == "__main__":
     print("DEBUG: Flask app ejecutándose directamente")
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    #app.run(host="0.0.0.0", port=10000, debug=True)#
