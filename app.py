@@ -42,6 +42,25 @@ AIRPORT_FEE = 6.50
 # ----------------------------
 # Helper: Google Sheets client
 # ----------------------------
+import os, base64, json, gspread
+from google.oauth2.service_account import Credentials
+
+def get_gspread_client():
+    if not os.path.exists("tripcounter-service-account.json"):
+        encoded = os.environ.get("SERVICE_ACCOUNT_B64")
+        if not encoded:
+            raise FileNotFoundError("Service account JSON not found.")
+        decoded = base64.b64decode(encoded)
+        with open("tripcounter-service-account.json", "wb") as f:
+            f.write(decoded)
+    
+    creds = Credentials.from_service_account_file("tripcounter-service-account.json", scopes=[
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ])
+    client = gspread.authorize(creds)
+    return client
+
 def get_gspread_client():
     """
     Returns a gspread client authorized with the service account JSON.
