@@ -276,13 +276,15 @@ def index():
     try:
         client = get_gspread_client()
         # load presupuestos to show reminders (if sheet exists)
-        try:
+                try:
             ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
             records = ws_pres.get_all_records()
             
             reminders = []
             today = date.today()
-            for r in records:
+            # Usamos enumerate para obtener el índice de la lista (i)
+            # El índice real de la fila en GSheets es i + 2 (1 por cabecera, 1 por 0-based)
+            for i, r in enumerate(records):
                 try:
                     fp = datetime.strptime(r.get("fecha_pago"), "%Y-%m-%d").date()
                 except Exception:
@@ -290,11 +292,21 @@ def index():
                 days_left = (fp - today).days
                 if r.get("pagado") in ("True","true","TRUE"):
                     continue
+                
+                # Preparamos los datos base del recordatorio
+                reminder_data = {
+                    "categoria": r.get("categoria"),
+                    "monto": r.get("monto"),
+                    "row_index": i + 2  # <--- ¡Añadimos el índice de la fila!
+                }
+                
                 # Recordatorios de 3 días y fecha de pago
                 if days_left == 3:
-                    reminders.append({"type":"3days","categoria":r.get("categoria"),"monto":r.get("monto")})
+                    reminder_data["type"] = "3days"
+                    reminders.append(reminder_data)
                 elif days_left == 0:
-                    reminders.append({"type":"due","categoria":r.get("categoria"),"monto":r.get("monto")})
+                    reminder_data["type"] = "due"
+                    reminders.append(reminder_data)
         except Exception as e:
             app.logger.error(f"Error cargando recordatorios: {e}")
             reminders = []
@@ -303,6 +315,7 @@ def index():
         reminders = []
 
     return render_template("home.html", email=email, reminders=reminders)
+
 
 @app.route("/viajes")
 def viajes_page():
