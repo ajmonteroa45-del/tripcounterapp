@@ -598,4 +598,84 @@ if (kmContainer) {
     kmDateInput.addEventListener('change', () => fetchKilometrajeState());
 }
 
+// =========================================================
+// LÓGICA DE RESUMEN DIARIO
+// =========================================================
+
+const summaryDateInput = document.getElementById('summary_fecha');
+const summaryResultsDiv = document.getElementById('summary-results');
+
+if (summaryResultsDiv) {
+
+    // Función para renderizar los resultados del resumen
+    function renderSummary(data) {
+        
+        const productivityClass = data.productivity_per_km >= 1.0 ? 'text-success' : (data.productivity_per_km > 0 ? 'text-warning' : 'text-danger');
+        
+        let html = `
+            <h4>Resultados para el ${data.fecha}</h4>
+            
+            <div class="row g-4 mt-3">
+                
+                <div class="col-md-6">
+                    <div class="card p-3 shadow-sm">
+                        <h5>💰 Ingresos y Gastos</h5>
+                        <hr>
+                        <p>Total de Viajes: <strong>${data.num_trips}</strong></p>
+                        <p class="h5 text-success">Ingreso Total (Neto + Bono): <strong>${formatCurrency(data.total_income)}</strong></p>
+                        <p class="h5 text-danger">Gastos Totales: <strong>${formatCurrency(data.total_expenses)}</strong></p>
+                        <hr>
+                        <p class="h4">GANANCIA NETA: <strong class="${data.net_income >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(data.net_income)}</strong></p>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card p-3 shadow-sm">
+                        <h5>🚗 Métrica de Productividad</h5>
+                        <hr>
+                        <p>KM Registrados: <strong>${data.total_km} km</strong></p>
+                        <p class="h3 ${productivityClass} mt-3">Soles Netos por KM:</p>
+                        <p class="h1 ${productivityClass}">**${data.productivity_per_km.toFixed(2)} S/KM**</p>
+                        ${data.productivity_per_km >= 1.0 ? 
+                            '<div class="alert alert-success mt-3">¡Excelente Productividad!</div>' : 
+                            '<div class="alert alert-warning mt-3">Revisa gastos o busca mayor demanda.</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        summaryResultsDiv.innerHTML = html;
+    }
+
+    // Función principal para obtener el resumen
+    async function fetchDailySummary(date = summaryDateInput.value) {
+        summaryResultsDiv.innerHTML = 'Calculando resumen diario...';
+        try {
+            const response = await fetch(`/api/summary?date=${date}`);
+            const data = await response.json();
+            
+            if (data.error) {
+                summaryResultsDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            if (data.num_trips === 0 && data.total_km === 0) {
+                 summaryResultsDiv.innerHTML = '<div class="alert alert-info">No hay datos de viajes ni kilometraje para esta fecha.</div>';
+                 return;
+            }
+            
+            renderSummary(data);
+
+        } catch (error) {
+            console.error('Error al obtener resumen:', error);
+            summaryResultsDiv.innerHTML = '<div class="alert alert-danger">Error de conexión con la API de resumen.</div>';
+        }
+    }
+    
+    // Inicialización y cambio de fecha
+    fetchDailySummary();
+    summaryDateInput.addEventListener('change', () => fetchDailySummary());
+}
+
 
