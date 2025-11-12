@@ -276,7 +276,7 @@ def index():
     try:
         client = get_gspread_client()
         # load presupuestos to show reminders (if sheet exists)
-    try:
+        try:
             ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
             records = ws_pres.get_all_records()
             
