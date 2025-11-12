@@ -65,6 +65,11 @@ PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "fecha_pago", "pagado"]
 EXTRAS_WS_NAME = "TripCounter_Extras"
 EXTRAS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Total"]
 
+# --- CONSTANTES DE HOJAS DE CÁLCULO ---
+# ... (otras constantes) ...
+# Kilometraje (Añadir a la lista)
+KM_WS_NAME = "TripCounter_Kilometraje"
+KM_HEADERS = ["Fecha", "KM Inicio", "KM Fin", "Recorrido", "Notas"]
 
 # ----------------------------
 # Debug inicial visible en Render logs
@@ -499,6 +504,90 @@ def api_presupuesto():
         except Exception as e:
             app.logger.error(f"Error actualizando celda en GSheets: {e}")
             return jsonify({"error":f"Error al actualizar la hoja: {e}"}), 500
+
+# app.py (Nueva ruta)
+
+@app.route("/api/kilometraje", methods=["GET", "POST"])
+def api_kilometraje():
+    """
+    POST: Registra el KM de inicio O actualiza el KM de fin para el día.
+    GET: Devuelve el registro de kilometraje del día.
+    """
+    if not session.get('email'):
+        return jsonify({"error":"not_authenticated"}), 401
+
+    client = get_gspread_client()
+    ws = ensure_sheet_with_headers(client, KM_WS_NAME, KM_HEADERS)
+    
+    qdate = request.args.get("date") or date.today().isoformat()
+    all_records = ws.get_all_records()
+    
+    # Buscar el registro existente para hoy (o la fecha consultada)
+    existing_record_index = -1
+    for i, r in enumerate(all_records):
+        if str(r.get("Fecha")) == str(qdate):
+            # i + 2 es el índice real de la fila en GSheets (1-based, saltando cabecera)
+            existing_record_index = i + 2 
+            break
+
+    # --- Lógica GET (Visualizar) ---
+    if request.method == "GET":
+        if existing_record_index > 0:
+            # Si se encuentra, retorna el registro (el registro tiene el índice 'i')
+            return jsonify(all_records[existing_record_index - 2]) 
+        else:
+            return jsonify({"status": "no_record", "message": "No hay registro de kilometraje para este día."}), 200
+
+    # --- Lógica POST (Registrar/Actualizar) ---
+    body = request.get_json() or {}
+    
+    # KM Start/End
+    km_value = body.get("km_value")
+    action = body.get("action") # 'start' o 'end'
+    notes = body.get("notas", "")
+    
+    try:
+        km_value = int(km_value)
+    except Exception:
+        return jsonify({"error": "km_invalido", "message": "El valor del kilometraje debe ser un número entero."}), 400
+
+    if action == 'start':
+        # 1. REGISTRAR INICIO
+        if existing_record_index > 0:
+            return jsonify({"error": "ya_iniciado", "message": "La jornada de hoy ya tiene un KM de inicio registrado."}), 409
+        
+        row = [qdate, km_value, "", "", notes] # KM Fin y Recorrido vacíos
+        ws.append_row(row)
+        return jsonify({"status": "start_recorded", "km_inicio": km_value}), 201
+
+    elif action == 'end':
+        # 2. ACTUALIZAR FIN
+        if existing_record_index == -1:
+            return jsonify({"error": "no_iniciado", "message": "No se puede finalizar sin un KM de inicio."}), 400
+        
+        # Obtener el registro actual para calcular la diferencia
+        current_record = all_records[existing_record_index - 2]
+        km_inicio = int(current_record.get("KM Inicio", 0))
+        km_fin = km_value
+        
+        if km_fin < km_inicio:
+            return jsonify({"error": "km_invalido", "message": "El KM final no puede ser menor que el KM de inicio."}), 400
+
+        recorrido = km_fin - km_inicio
+        
+        # Columnas a actualizar (Recuerda que GSheets es 1-based)
+        KM_FIN_COL = KM_HEADERS.index("KM Fin") + 1
+        RECORRIDO_COL = KM_HEADERS.index("Recorrido") + 1
+        
+        # Realizar las dos actualizaciones en la misma fila (existing_record_index)
+        ws.update_cell(existing_record_index, KM_FIN_COL, km_fin)
+        ws.update_cell(existing_record_index, RECORRIDO_COL, recorrido)
+        
+        return jsonify({"status": "end_recorded", "km_fin": km_fin, "recorrido": recorrido}), 200
+
+    else:
+        return jsonify({"error": "accion_invalida", "message": "La acción debe ser 'start' o 'end'."}), 400
+
 
 # ----------------------------
 # Run
