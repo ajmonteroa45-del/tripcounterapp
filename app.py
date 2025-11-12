@@ -6,12 +6,14 @@ import json
 import logging
 import sys
 from datetime import date, datetime, timedelta
+# Importamos 'flash' y 'gspread.exceptions' para la detección de nuevo usuario
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import service_account
 import gspread
 import base64
 from google.oauth2.service_account import Credentials
+import gspread.exceptions # Necesario para capturar CellNotFound
 
 # ----------------------------
 # CONFIG / LOGGING
@@ -249,14 +251,41 @@ def oauth2callback():
     try:
         oauth = OAuth2Session(CLIENT_ID, state=session.get('oauth_state'), redirect_uri=REDIRECT_URI)
         token = oauth.fetch_token(TOKEN_URL, client_secret=CLIENT_SECRET, authorization_response=request.url)
-        # decode email from token using jwt library is optional; we can request userinfo
+        
         userinfo = oauth.get("https://www.googleapis.com/oauth2/v2/userinfo").json()
         session['email'] = userinfo.get('email')
         app.logger.info(f"User logged in: {session.get('email')}")
+        
+        # --- LÓGICA DE VERIFICACIÓN DE NUEVO USUARIO ---
+        client = get_gspread_client()
+        ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
+        
+        email_to_check = session.get('email')
+        is_new_user = False
+        
+        try:
+            # gspread.find() lanza CellNotFound si no encuentra el valor en la hoja
+            ws_pres.find(email_to_check)
+        except gspread.exceptions.CellNotFound:
+            is_new_user = True
+        except Exception as e:
+            # Error de conexión GSheets: registramos el error y asumimos usuario existente
+            app.logger.error(f"Error al verificar existencia de usuario: {e}")
+            is_new_user = False 
+
+        # Si el usuario es nuevo, lo enviamos a configurar el presupuesto
+        if is_new_user:
+            app.logger.info(f"Nuevo usuario {email_to_check} detectado. Redirigiendo a Presupuesto.")
+            flash('¡Bienvenido/a! Por favor, agrega tus primeros ítems de presupuesto para empezar.', 'success')
+            return redirect(url_for("presupuesto_page")) # <--- Redirigido a la página de presupuesto
+
+        # Si no es nuevo, lo enviamos a la página principal
         return redirect(url_for("index"))
+
     except Exception as e:
         app.logger.error(f"OAuth callback error: {e}")
         return f"<h3>Authentication failed: {e}</h3>", 500
+
 
 @app.route("/logout")
 def logout():
