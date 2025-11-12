@@ -458,3 +458,144 @@ if (budgetForm) {
     fetchAndDisplayBudget(); // Inicializar
 }
 
+// =========================================================
+// LÓGICA DE KILOMETRAJE
+// =========================================================
+
+const kmDateInput = document.getElementById('km_fecha');
+const kmContainer = document.getElementById('km-state-container');
+
+if (kmContainer) {
+    // Función para renderizar el formulario de inicio o fin
+    function renderKilometrajeForm(state, km_inicio = null) {
+        let html = '';
+        if (state === 'start') {
+            html = `
+                <h4 class="text-primary">1. Iniciar Jornada</h4>
+                <form id="km-form-start" class="mt-3">
+                    <label class="form-label">KM Actual (Inicio):
+                        <input type="number" name="km_value" class="form-control" required placeholder="Ej: 54321">
+                    </label>
+                    <label class="form-label mt-2">Notas:
+                        <input type="text" name="notas" class="form-control" placeholder="Ej: Full de gasolina">
+                    </label>
+                    <button type="submit" class="btn btn-primary mt-3">▶️ Iniciar KM</button>
+                </form>
+            `;
+        } else if (state === 'end') {
+            html = `
+                <h4 class="text-success">2. Finalizar Jornada</h4>
+                <div class="alert alert-info">KM de Inicio registrado: <strong>${km_inicio}</strong></div>
+                <form id="km-form-end" class="mt-3">
+                    <label class="form-label">KM Actual (Fin):
+                        <input type="number" name="km_value" class="form-control" required placeholder="Debe ser mayor que ${km_inicio}">
+                    </label>
+                    <button type="submit" class="btn btn-success mt-3">🏁 Finalizar KM</button>
+                </form>
+            `;
+        } else if (state === 'done') {
+            html = `
+                <h4 class="text-success">✅ Jornada Finalizada</h4>
+                <p>El registro de kilometraje para esta fecha está completo.</p>
+                <p>KM Recorrido: <strong>${km_inicio} km</strong></p>
+                <div class="alert alert-success mt-3">¡Día productivo! Puedes revisar el resumen.</div>
+            `;
+        } else {
+            html = '<div class="alert alert-warning">Error: Estado desconocido.</div>';
+        }
+        kmContainer.innerHTML = html;
+        attachFormListeners();
+    }
+
+    // Función principal para obtener el estado actual
+    async function fetchKilometrajeState(date = kmDateInput.value) {
+        kmContainer.innerHTML = 'Consultando estado...';
+        try {
+            const response = await fetch(`/api/kilometraje?date=${date}`);
+            const data = await response.json();
+            
+            if (response.status === 200 && data.status === "no_record") {
+                renderKilometrajeForm('start');
+            } else if (data.Fecha) {
+                const kmInicio = parseInt(data['KM Inicio']);
+                const kmFin = data['KM Fin'];
+                
+                if (kmFin && kmFin !== "") {
+                    renderKilometrajeForm('done', data['Recorrido']);
+                } else {
+                    renderKilometrajeForm('end', kmInicio);
+                }
+            } else {
+                kmContainer.innerHTML = `<div class="alert alert-danger">Error: ${data.message || 'No se pudo cargar el estado.'}</div>`;
+            }
+        } catch (error) {
+            console.error('Error al obtener estado de kilometraje:', error);
+            kmContainer.innerHTML = '<div class="alert alert-danger">Error de conexión con la API de kilometraje.</div>';
+        }
+    }
+
+    // Manejar el envío de los formularios
+    function attachFormListeners() {
+        // --- Listener de INICIO ---
+        const formStart = document.getElementById('km-form-start');
+        if (formStart) {
+            formStart.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const kmValue = formStart.km_value.value;
+                const notas = formStart.notas.value;
+                
+                const response = await sendKmData(kmValue, 'start', notas);
+                if (response && response.status === 'start_recorded') {
+                    alert(`✅ KM de inicio (${kmValue}) registrado.`);
+                    fetchKilometrajeState();
+                } else if (response && response.error) {
+                    alert(`Error: ${response.message}`);
+                }
+            });
+        }
+        
+        // --- Listener de FIN ---
+        const formEnd = document.getElementById('km-form-end');
+        if (formEnd) {
+            formEnd.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const kmValue = formEnd.km_value.value;
+                
+                const response = await sendKmData(kmValue, 'end');
+                if (response && response.status === 'end_recorded') {
+                    alert(`🏁 Jornada finalizada. Recorrido: ${response.recorrido} km.`);
+                    fetchKilometrajeState();
+                } else if (response && response.error) {
+                    alert(`Error: ${response.message}`);
+                }
+            });
+        }
+    }
+    
+    // Función genérica para enviar datos a la API
+    async function sendKmData(km_value, action, notas = "") {
+        try {
+            const response = await fetch('/api/kilometraje', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    date: kmDateInput.value,
+                    km_value: km_value,
+                    action: action,
+                    notas: notas
+                })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error de red al enviar KM:', error);
+            alert('Error de red. Intenta de nuevo.');
+            return null;
+        }
+    }
+    
+    // Inicialización y cambio de fecha
+    fetchKilometrajeState();
+    kmDateInput.addEventListener('change', () => fetchKilometrajeState());
+}
+
+
