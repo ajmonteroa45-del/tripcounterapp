@@ -12,6 +12,17 @@ import gspread
 import base64
 from google.oauth2.service_account import Credentials
 
+# --- CONSTANTES ---
+GASTOS_WS_NAME = "TripCounter_Gastos"
+GASTOS_HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
+# --- FIN CONSTANTES ---
+
+# --- CONSTANTES DE PRESUPUESTO (Añadir a app.py) ---
+PRESUPUESTO_WS_NAME = "TripCounter_Presupuesto"
+PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "fecha_pago", "pagado"] 
+# --- FIN CONSTANTES DE PRESUPUESTO ---
+
+
 # ----------------------------
 # CONFIG / LOGGING
 # ----------------------------
