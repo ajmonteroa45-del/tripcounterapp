@@ -961,3 +961,78 @@ function initializeReportPage() {
     populateMonths();
 }
  
+
+// --- LÓGICA ESPECÍFICA PARA MARCAR PRESUPUESTOS (Añadir a scripts.js) ---
+
+// URL de Producción para la API de presupuesto
+const PRODUCTION_DOMAIN = 'https://www.tripcounter.online';
+const PRESUPUESTO_API_URL = `${PRODUCTION_DOMAIN}/api/presupuesto`;
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (Tu lógica global de inicialización) ...
+    
+    // Inicializar la lógica específica para la página home
+    if (document.querySelector('.reminders-section, .card')) {
+        initializeHomeReminders();
+    }
+    // ... (Asegúrate de que tus otras inicializaciones estén aquí) ...
+});
+
+
+function initializeHomeReminders() {
+    const paidButtons = document.querySelectorAll('.mark-paid-btn');
+    
+    paidButtons.forEach(button => {
+        button.addEventListener('click', async (event) => {
+            const row_index = event.target.dataset.rowIndex;
+            const category = event.target.dataset.category;
+            
+            if (!row_index) {
+                console.error("Índice de fila no encontrado.");
+                return;
+            }
+
+            // Confirmación opcional para el usuario
+            if (!confirm(`¿Estás seguro de que quieres marcar "${category}" (Fila ${row_index}) como pagado?`)) {
+                return;
+            }
+
+            event.target.disabled = true;
+            event.target.textContent = 'Actualizando...';
+            
+            try {
+                const response = await fetch(PRESUPUESTO_API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // Enviamos el row_index que la API espera
+                    body: JSON.stringify({ row_index: row_index }),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+
+                if (response.ok && data.status === 'ok') {
+                    // Si es exitoso, actualiza visualmente la lista
+                    const listItem = event.target.closest('li');
+                    if (listItem) {
+                        listItem.style.opacity = '0.5';
+                        listItem.innerHTML = `✅ ${category} marcado como pagado. (Recarga la página para verificar)`;
+                    }
+                } else {
+                    alert(`Error al marcar como pagado: ${data.error || 'Error desconocido'}`);
+                    event.target.textContent = 'Marcar como pagado';
+                    event.target.disabled = false;
+                }
+                
+            } catch (error) {
+                console.error('Error en la conexión:', error);
+                alert('Error de conexión o servidor al intentar actualizar el pago.');
+                event.target.textContent = 'Marcar como pagado';
+                event.target.disabled = false;
+            }
+        });
+    });
+}
