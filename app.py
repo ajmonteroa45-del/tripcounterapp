@@ -176,62 +176,169 @@ def presupuesto_page():
         return redirect(url_for("login"))
     return render_template("presupuesto.html", email=session.get('email'))
 
+from datetime import datetime, date
+from flask import jsonify, request, session
+# Asegúrate de importar tus funciones de GSheets:
+# from tu_modulo import get_gspread_client, ensure_sheet_with_headers
+
+# --- CONSTANTES DE BONIFICACIÓN ---
+# Bonos en Soles (S/)
+BONUS_RULES = {
+    # Lunes (0) a Jueves (3)
+    'LUN_JUE': {13: 16, 17: 9, 21: 12, 25: 16},
+    # Viernes (4) y Sábado (5)
+    'VIE_SAB': {13: 15, 17: 10, 21: 13, 25: 15},
+    # Domingo (6)
+    'DOM': {12: 14, 16: 10, 19: 11, 23: 14},
+}
+
+TRIPS_WS_NAME = "TripCounter_Trips"
+TRIPS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Propina","Aeropuerto","Total"]
+BONUS_WS_NAME = "TripCounter_Bonuses"
+BONUS_HEADERS = ["Fecha", "Bono total"]
+
+# --- FUNCIONES DE LÓGICA DE NEGOCIO ---
+
+def get_bonus_type(day_of_week):
+    """Retorna la clave del tipo de bono basado en el día (0=Lunes, 6=Domingo)"""
+    if 0 <= day_of_week <= 3: 
+        return 'LUN_JUE'
+    elif day_of_week in (4, 5): 
+        return 'VIE_SAB'
+    elif day_of_week == 6: 
+        return 'DOM'
+    return None
+
+def calculate_current_bonus(records_today):
+    """Calcula el bono total aplicable para el día basado en el número de viajes."""
+    if not records_today:
+        return 0.0
+
+    try:
+        trip_date = datetime.strptime(records_today[0]["Fecha"], '%Y-%m-%d').date()
+    except Exception:
+        return 0.0
+        
+    day_of_week = trip_date.weekday()
+    num_trips = len(records_today)
+    
+    rules = BONUS_RULES.get(get_bonus_type(day_of_week), {})
+    total_bonus = 0.0
+    
+    # Sumar los bonos acumulativos al alcanzar las metas
+    sorted_goals = sorted(rules.keys())
+    
+    for goal in sorted_goals:
+        if num_trips >= goal:
+            total_bonus += rules[goal]
+
+    return total_bonus
+
+def update_daily_bonus_sheet(client, fecha, total_bonus):
+    """Guarda o actualiza el bono diario total en la hoja 'TripCounter_Bonuses'."""
+    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
+    
+    records = ws_bonuses.get_all_records()
+    found = False
+    
+    # Buscar si ya existe un registro para esa fecha para actualizarlo
+    for i, r in enumerate(records):
+        if str(r.get("Fecha")) == str(fecha):
+            # i+2: fila real; +1: columna de "Bono total"
+            row_index = i + 2 
+            col_index = BONUS_HEADERS.index("Bono total") + 1
+            ws_bonuses.update_cell(row_index, col_index, total_bonus)
+            found = True
+            break
+            
+    if not found:
+        # Añadir nueva fila si la fecha no existe
+        new_row = [fecha, total_bonus]
+        ws_bonuses.append_row(new_row)
+        
+    return total_bonus
+
 # ----------------------------
-# API: Trips
+# API: Trips (Ruta Unificada)
 # ----------------------------
 @app.route("/api/trips", methods=["GET", "POST"])
 def api_trips():
     """
-    GET: optional ?date=YYYY-MM-DD returns trips for that date (defaults to today)
-    POST: JSON with keys: fecha (optional), hora_inicio, hora_fin, monto, propina (optional), aeropuerto (bool)
+    GET: optional ?date=YYYY-MM-DD returns trips and bonus for that date (defaults to today)
+    POST: Registers a trip, recalculates, and updates the daily bonus.
     """
     if not session.get('email'):
         return jsonify({"error":"not_authenticated"}), 401
 
     client = get_gspread_client()
-    headers = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Propina","Aeropuerto","Total"]
-    ws = ensure_sheet_with_headers(client, "TripCounter_Trips", headers)
+    ws_trips = ensure_sheet_with_headers(client, TRIPS_WS_NAME, TRIPS_HEADERS)
+    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS) # Solo para asegurar la creación si no existe
 
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
-        records = ws.get_all_records()
-        filtered = [r for r in records if str(r.get("Fecha")) == str(qdate)]
-        return jsonify(filtered)
+        
+        # 1. Obtener viajes del día
+        all_trips = ws_trips.get_all_records()
+        filtered_trips = [r for r in all_trips if str(r.get("Fecha")) == str(qdate)]
+        
+        # 2. Obtener bono del día
+        all_bonuses = ws_bonuses.get_all_records()
+        # next() busca el bono para la fecha, sino usa 0.0 por defecto
+        current_bonus = next((float(r.get('Bono total', 0.0)) for r in all_bonuses if str(r.get("Fecha")) == str(qdate)), 0.0)
+        
+        return jsonify({"trips": filtered_trips, "bonus": current_bonus})
 
-    # POST
+    # POST (Registro de Viaje)
     body = request.get_json() or {}
-    # Fecha: optional, defaults today
     fecha = body.get("fecha") or date.today().isoformat()
     hora_inicio = str(body.get("hora_inicio","")).strip()
     hora_fin = str(body.get("hora_fin","")).strip()
+    
+    # Validaciones de montos
     try:
         monto = float(body.get("monto", 0))
     except Exception:
         return jsonify({"error":"invalid_monto"}), 400
+        
     propina = 0.0
-    if body.get("propina"):
-        try:
-            propina = float(body.get("propina",0))
-        except Exception:
-            propina = 0.0
+    try:
+        propina = float(body.get("propina", 0)) if body.get("propina") else 0.0
+    except Exception:
+        propina = 0.0
+            
     aeropuerto_flag = bool(body.get("aeropuerto", False))
-    aeropuerto_val = AIRPORT_FEE if aeropuerto_flag else 0.0
+    aeropuerto_val = AIRPORT_FEE if aeropuerto_flag else 0.0 
     total = round(monto + propina + aeropuerto_val, 2)
 
-    # Prevent duplicates: same date + hora_inicio + hora_fin
-    records = ws.get_all_records()
-    for r in records:
+    # Obtener todos los viajes para calcular duplicados y número
+    all_trips = ws_trips.get_all_records()
+
+    # Prevención de duplicados
+    for r in all_trips:
         if str(r.get("Fecha")) == str(fecha) and str(r.get("Hora inicio")) == hora_inicio and str(r.get("Hora fin")) == hora_fin:
             return jsonify({"error":"duplicate"}), 409
 
-    # compute numero (count of all rows with the same date) +1 or global count+1
-    same_date_count = sum(1 for r in records if str(r.get("Fecha")) == str(fecha))
+    # Cálculo del número de viaje
+    same_date_count = sum(1 for r in all_trips if str(r.get("Fecha")) == str(fecha))
     numero = same_date_count + 1
 
+    # 1. Registrar el nuevo viaje
     row = [fecha, numero, hora_inicio, hora_fin, monto, propina, aeropuerto_val, total]
-    ws.append_row(row)
+    ws_trips.append_row(row)
     app.logger.info(f"New trip appended: {row}")
-    return jsonify({"status":"ok","trip":dict(zip(headers,row))}), 201
+    
+    # 2. Recalcular y actualizar el bono del día
+    # Volver a obtener la lista para asegurar que el registro POST esté incluido en el cálculo del bono
+    all_trips_after_post = ws_trips.get_all_records()
+    trips_today = [r for r in all_trips_after_post if str(r.get("Fecha")) == str(fecha)]
+    
+    current_bonus = calculate_current_bonus(trips_today)
+    update_daily_bonus_sheet(client, fecha, current_bonus)
+    
+    # Respuesta
+    return jsonify({"status":"ok","trip":dict(zip(TRIPS_HEADERS,row)), "new_bonus": current_bonus}), 201
+
+
 
 # ----------------------------
 # API: Extras (similar but no propina/aeropuerto)
