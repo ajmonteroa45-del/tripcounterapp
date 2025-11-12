@@ -1,14 +1,18 @@
 {% extends "base.html" %}
+
+{% block title %}Registro de Kilometraje{% endblock %}
+
 {% block content %}
-<div class="card">
-  <h3>Kilometraje y generar resumen</h3>
-  {% if message %}
-    <div class="msg {{ message.type }}">{{ message.text }}</div>
-  {% endif %}
-  <form method="post" class="form-grid">
-    <label>Combustible gastado (S/) <input name="combustible" class="input" type="number" step="0.01"></label>
-    <label>Kilometraje final (km) <input name="km_final" class="input" type="number" step="0.1"></label>
-    <div><button class="btn" type="submit">Generar resumen final y guardar</button></div>
-  </form>
+<div class="container mt-4">
+    <h2 class="mb-4">🚗 Kilometraje Diario</h2>
+    <section class="card p-4 shadow-sm">
+        <label>Fecha:
+            <input type="date" name="fecha" id="km_fecha" class="form-control" 
+                   value="{{ (datetime.utcnow().date()).isoformat() }}">
+        </label>
+        <div id="km-state-container" class="mt-4">
+            Cargando estado del kilometraje...
+        </div>
+    </section>
 </div>
 {% endblock %}
