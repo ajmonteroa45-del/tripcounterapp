@@ -11,13 +11,22 @@
   </nav>
 
   {% if reminders %}
-    <section class="card">
-      <h3>Recordatorios</h3>
+    <section class="card reminders-section">
+      <h3>⚠️ Recordatorios</h3>
       <ul>
         {% for r in reminders %}
           <li>
             {% if r.type == '3days' %}En 3 días: {% elif r.type == 'due' %}Hoy vence: {% endif %}
-            <strong>{{ r.categoria }}</strong> — {{ r.monto }}
+            
+            <strong>{{ r.categoria }}</strong> — S/ {{ "{:,.2f}".format(r.monto) }}
+            
+            <button 
+                class="mark-paid-btn" 
+                data-row-index="{{ r.row_index }}"
+                data-category="{{ r.categoria }}"
+            >
+                Marcar como pagado
+            </button>
           </li>
         {% endfor %}
       </ul>
