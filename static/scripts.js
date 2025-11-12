@@ -1036,3 +1036,172 @@ function initializeHomeReminders() {
         });
     });
 }
+
+
+// --- LÓGICA ESPECÍFICA PARA PRESUPUESTOS (Añadir a scripts.js) ---
+
+// Reutilizamos el dominio de producción
+const PRODUCTION_DOMAIN = 'https://www.tripcounter.online';
+const PRESUPUESTO_API_URL = `${PRODUCTION_DOMAIN}/api/presupuesto`;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (Tu lógica global de inicialización) ...
+    
+    // Inicializar la lógica específica para la página de presupuesto
+    if (document.getElementById('budget-form')) {
+        initializeBudgetPage();
+    }
+});
+
+function initializeBudgetPage() {
+    const budgetForm = document.getElementById('budget-form');
+    const budgetListContainer = document.getElementById('budget-list-container');
+    const budgetMessageDiv = document.getElementById('budget-message');
+
+    // 1. Inicialización: Carga los presupuestos al cargar la página
+    loadBudgets();
+
+    // 2. Manejo del Formulario (POST: Crear nuevo presupuesto)
+    budgetForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        budgetMessageDiv.innerHTML = 'Procesando...';
+        budgetMessageDiv.className = '';
+
+        const formData = new FormData(budgetForm);
+        const data = Object.fromEntries(formData.entries());
+        
+        try {
+            const response = await fetch(PRESUPUESTO_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'ok') {
+                budgetMessageDiv.innerHTML = '✅ ¡Presupuesto añadido con éxito!';
+                budgetMessageDiv.className = 'message-box success';
+                budgetForm.reset(); // Limpia el formulario
+                loadBudgets(); // Recarga la lista
+            } else {
+                const msg = result.message || result.error || 'Error al añadir presupuesto.';
+                budgetMessageDiv.innerHTML = `❌ Error: ${msg}`;
+                budgetMessageDiv.className = 'message-box error';
+            }
+        } catch (error) {
+            console.error('Error al enviar el formulario:', error);
+            budgetMessageDiv.innerHTML = '❌ Error de conexión con el servidor.';
+            budgetMessageDiv.className = 'message-box error';
+        }
+    });
+
+    // 3. Función para Cargar y Renderizar Presupuestos (GET)
+    async function loadBudgets() {
+        budgetListContainer.innerHTML = '<p>Cargando presupuestos...</p>';
+
+        try {
+            const response = await fetch(PRESUPUESTO_API_URL, { 
+                method: 'GET',
+                credentials: 'include'
+            });
+            const records = await response.json();
+
+            if (!response.ok) {
+                budgetListContainer.innerHTML = `<p class="error">❌ Error al cargar datos: ${records.error || 'No autorizado.'}</p>`;
+                return;
+            }
+
+            if (records.length === 0) {
+                budgetListContainer.innerHTML = '<p>No hay presupuestos registrados.</p>';
+                return;
+            }
+
+            // 4. Construcción de la Tabla
+            let html = '<table class="summary-table">';
+            html += '<thead><tr><th>Categoría</th><th>Monto</th><th>Fecha de Pago</th><th>Pagado</th><th>Acción</th></tr></thead>';
+            html += '<tbody>';
+            
+            // i es el índice del array (0-based). La fila real de GSheets es i + 2
+            records.forEach((r, i) => {
+                const rowIndex = i + 2; 
+                const isPaid = r.pagado === true || r.pagado === 'True' || r.pagado === 'TRUE';
+                
+                html += `
+                    <tr data-row-index="${rowIndex}" class="${isPaid ? 'paid' : 'pending'}">
+                        <td>${r.categoria}</td>
+                        <td>S/ ${r.monto.toFixed(2)}</td>
+                        <td>${r.fecha_pago}</td>
+                        <td>${isPaid ? '✅ SÍ' : '❌ NO'}</td>
+                        <td>
+                            ${isPaid ? 
+                                '<span class="success">Pagado</span>' : 
+                                `<button class="btn small mark-paid-btn" data-row-index="${rowIndex}">Marcar como pagado</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            budgetListContainer.innerHTML = html;
+
+            // 5. Asignar Event Listeners para la acción PUT
+            attachMarkPaidListeners();
+
+        } catch (error) {
+            console.error('Error al cargar la lista de presupuestos:', error);
+            budgetListContainer.innerHTML = '<p class="error">❌ No se pudo conectar con la API de presupuestos.</p>';
+        }
+    }
+    
+    // 6. Función para Marcar como Pagado (PUT)
+    function attachMarkPaidListeners() {
+        const markPaidButtons = budgetListContainer.querySelectorAll('.mark-paid-btn');
+        
+        markPaidButtons.forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const row_index = event.target.dataset.rowIndex;
+                const listItem = event.target.closest('tr');
+                const category = listItem.querySelector('td:first-child').textContent;
+                
+                if (!row_index) return;
+
+                if (!confirm(`¿Marcar "${category}" como pagado?`)) return;
+
+                event.target.disabled = true;
+                event.target.textContent = 'Actualizando...';
+                
+                try {
+                    const response = await fetch(PRESUPUESTO_API_URL, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ row_index: row_index }),
+                        credentials: 'include'
+                    });
+                    
+                    const result = await response.json();
+
+                    if (response.ok && result.status === 'ok') {
+                        // Si es exitoso, recarga la lista para reflejar el cambio
+                        loadBudgets();
+                    } else {
+                        alert(`Error al marcar como pagado: ${result.error || 'Error desconocido'}`);
+                        event.target.textContent = 'Marcar como pagado';
+                        event.target.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Error en la conexión:', error);
+                    alert('Error de conexión o servidor.');
+                    event.target.textContent = 'Marcar como pagado';
+                    event.target.disabled = false;
+                }
+            });
+        });
+    }
+
+    // Inicializa los listeners del formulario
+    // La carga inicial (loadBudgets) ya fue llamada al principio
+}
+
