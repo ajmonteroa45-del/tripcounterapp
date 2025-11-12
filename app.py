@@ -1,9 +1,10 @@
- # app.py - Trip Counter (Flask)
+# app.py - Trip Counter (Flask)
 print("DEBUG: app.py ha iniciado correctamente")
 
 import os
 import json
 import logging
+import sys
 from datetime import date, datetime
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from requests_oauthlib import OAuth2Session
@@ -12,25 +13,12 @@ import gspread
 import base64
 from google.oauth2.service_account import Credentials
 
-# --- CONSTANTES ---
-GASTOS_WS_NAME = "TripCounter_Gastos"
-GASTOS_HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
-# --- FIN CONSTANTES ---
-
-# --- CONSTANTES DE PRESUPUESTO (Añadir a app.py) ---
-PRESUPUESTO_WS_NAME = "TripCounter_Presupuesto"
-PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "fecha_pago", "pagado"] 
-# --- FIN CONSTANTES DE PRESUPUESTO ---
-
-
 # ----------------------------
 # CONFIG / LOGGING
 # ----------------------------
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, static_folder="static", template_folder="templates")
-import sys
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
-app.logger.setLevel(logging.DEBUG)
 app.logger.setLevel(logging.INFO)
 
 # Environment variables (must be configured)
@@ -46,16 +34,37 @@ if not FLASK_SECRET_KEY:
 else:
     app.secret_key = FLASK_SECRET_KEY
 
-# OAuth endpoints
+# OAuth endpoints and scopes
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = ["openid", "email", "profile"]
-
-# Google Sheets scopes
 GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
 
 # Fixed airport fee
 AIRPORT_FEE = 6.50
+
+# --- CONSTANTES DE HOJAS DE CÁLCULO ---
+# Viajes
+TRIPS_WS_NAME = "TripCounter_Trips"
+TRIPS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Propina","Aeropuerto","Total"]
+# Bonos
+BONUS_WS_NAME = "TripCounter_Bonuses"
+BONUS_HEADERS = ["Fecha", "Bono total"]
+BONUS_RULES = {
+    'LUN_JUE': {13: 16, 17: 9, 21: 12, 25: 16},
+    'VIE_SAB': {13: 15, 17: 10, 21: 13, 25: 15},
+    'DOM': {12: 14, 16: 10, 19: 11, 23: 14},
+}
+# Gastos
+GASTOS_WS_NAME = "TripCounter_Gastos"
+GASTOS_HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
+# Presupuesto
+PRESUPUESTO_WS_NAME = "TripCounter_Presupuesto"
+PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "fecha_pago", "pagado"] 
+# Extras
+EXTRAS_WS_NAME = "TripCounter_Extras"
+EXTRAS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Total"]
+
 
 # ----------------------------
 # Debug inicial visible en Render logs
@@ -70,9 +79,10 @@ def startup_debug():
         app._startup_debug_done = True
 
 # ----------------------------
-# Google Sheets Client
+# Google Sheets Client & Utilitarios
 # ----------------------------
 def get_gspread_client():
+    # ... (Tu código para obtener el cliente de GSpread) ...
     b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
     print("DEBUG: SERVICE_ACCOUNT_B64 presente:", bool(b64_credentials))
 
@@ -86,12 +96,105 @@ def get_gspread_client():
         creds_dict,
         scopes=[
             "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file"8
+            "https://www.googleapis.com/auth/drive.file"
         ]
     )
 
     client = gspread.authorize(credentials)
     return client
+
+# --- PLACEHOLDER CRÍTICO ---
+def ensure_sheet_with_headers(client, ws_name, headers):
+    """
+    ⚠️ REEMPLAZAR ESTA FUNCIÓN. 
+    Esta función es necesaria para que el código de la API funcione.
+    Debe abrir la Hoja de Cálculo (workbook) y luego obtener o crear la Hoja de Trabajo (worksheet) 
+    con el nombre 'ws_name', asegurando que tenga las 'headers' correctas.
+    """
+    # Ejemplo de implementación (Ajustar a tu nombre de Hoja de Cálculo principal):
+    # workbook = client.open("NombreDeTuHojaPrincipal")
+    # try:
+    #     ws = workbook.worksheet(ws_name)
+    # except gspread.WorksheetNotFound:
+    #     ws = workbook.add_worksheet(title=ws_name, rows=100, cols=20)
+    #     ws.insert_row(headers, 1)
+    # return ws
+    
+    # Placeholder: Asumimos que la hoja 'Uber' es el workbook
+    try:
+        workbook = client.open("Uber") 
+    except gspread.WorksheetNotFound:
+        # Fallback si no encuentra el workbook por nombre (Ajustar)
+        raise Exception("No se encontró el Workbook 'Uber'.") 
+
+    try:
+        ws = workbook.worksheet(ws_name)
+    except gspread.WorksheetNotFound:
+        ws = workbook.add_worksheet(title=ws_name, rows=100, cols=20)
+        ws.insert_row(headers, 1)
+        
+    return ws
+# --- FIN PLACEHOLDER CRÍTICO ---
+
+
+# ----------------------------
+# FUNCIONES DE LÓGICA DE NEGOCIO (Bonos)
+# ----------------------------
+def get_bonus_type(day_of_week):
+    """Retorna la clave del tipo de bono basado en el día (0=Lunes, 6=Domingo)"""
+    if 0 <= day_of_week <= 3: 
+        return 'LUN_JUE'
+    elif day_of_week in (4, 5): 
+        return 'VIE_SAB'
+    elif day_of_week == 6: 
+        return 'DOM'
+    return None
+
+def calculate_current_bonus(records_today):
+    """Calcula el bono total aplicable para el día basado en el número de viajes."""
+    if not records_today:
+        return 0.0
+
+    try:
+        trip_date = datetime.strptime(records_today[0]["Fecha"], '%Y-%m-%d').date()
+    except Exception:
+        return 0.0
+        
+    day_of_week = trip_date.weekday()
+    num_trips = len(records_today)
+    
+    rules = BONUS_RULES.get(get_bonus_type(day_of_week), {})
+    total_bonus = 0.0
+    
+    sorted_goals = sorted(rules.keys())
+    
+    for goal in sorted_goals:
+        if num_trips >= goal:
+            total_bonus += rules[goal]
+
+    return total_bonus
+
+def update_daily_bonus_sheet(client, fecha, total_bonus):
+    """Guarda o actualiza el bono diario total en la hoja 'TripCounter_Bonuses'."""
+    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
+    
+    records = ws_bonuses.get_all_records()
+    found = False
+    
+    for i, r in enumerate(records):
+        if str(r.get("Fecha")) == str(fecha):
+            row_index = i + 2 
+            col_index = BONUS_HEADERS.index("Bono total") + 1
+            ws_bonuses.update_cell(row_index, col_index, total_bonus)
+            found = True
+            break
+            
+    if not found:
+        new_row = [fecha, total_bonus]
+        ws_bonuses.append_row(new_row)
+        
+    return total_bonus
+
 
 # ----------------------------
 # ROUTES: Auth
@@ -115,7 +218,6 @@ def oauth2callback():
     try:
         oauth = OAuth2Session(CLIENT_ID, state=session.get('oauth_state'), redirect_uri=REDIRECT_URI)
         token = oauth.fetch_token(TOKEN_URL, client_secret=CLIENT_SECRET, authorization_response=request.url)
-        id_token = token.get('id_token')
         # decode email from token using jwt library is optional; we can request userinfo
         userinfo = oauth.get("https://www.googleapis.com/oauth2/v2/userinfo").json()
         session['email'] = userinfo.get('email')
@@ -144,13 +246,12 @@ def index():
         client = get_gspread_client()
         # load presupuestos to show reminders (if sheet exists)
         try:
-            ws_pres = ensure_sheet_with_headers(client, "TripCounter_Presupuesto", ["alias","categoria","monto","fecha_pago","pagado"])
+            ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
             records = ws_pres.get_all_records()
-            # compute simple reminders for this email
+            
             reminders = []
             today = date.today()
             for r in records:
-                # filter by email if alias stored; if not, assume all
                 try:
                     fp = datetime.strptime(r.get("fecha_pago"), "%Y-%m-%d").date()
                 except Exception:
@@ -158,13 +259,16 @@ def index():
                 days_left = (fp - today).days
                 if r.get("pagado") in ("True","true","TRUE"):
                     continue
+                # Recordatorios de 3 días y fecha de pago
                 if days_left == 3:
                     reminders.append({"type":"3days","categoria":r.get("categoria"),"monto":r.get("monto")})
                 elif days_left == 0:
                     reminders.append({"type":"due","categoria":r.get("categoria"),"monto":r.get("monto")})
-        except Exception:
+        except Exception as e:
+            app.logger.error(f"Error cargando recordatorios: {e}")
             reminders = []
-    except Exception:
+    except Exception as e:
+        app.logger.error(f"Error conectando a GSheets: {e}")
         reminders = []
 
     return render_template("home.html", email=email, reminders=reminders)
@@ -187,88 +291,6 @@ def presupuesto_page():
         return redirect(url_for("login"))
     return render_template("presupuesto.html", email=session.get('email'))
 
-from datetime import datetime, date
-from flask import jsonify, request, session
-# Asegúrate de importar tus funciones de GSheets:
-# from tu_modulo import get_gspread_client, ensure_sheet_with_headers
-
-# --- CONSTANTES DE BONIFICACIÓN ---
-# Bonos en Soles (S/)
-BONUS_RULES = {
-    # Lunes (0) a Jueves (3)
-    'LUN_JUE': {13: 16, 17: 9, 21: 12, 25: 16},
-    # Viernes (4) y Sábado (5)
-    'VIE_SAB': {13: 15, 17: 10, 21: 13, 25: 15},
-    # Domingo (6)
-    'DOM': {12: 14, 16: 10, 19: 11, 23: 14},
-}
-
-TRIPS_WS_NAME = "TripCounter_Trips"
-TRIPS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Propina","Aeropuerto","Total"]
-BONUS_WS_NAME = "TripCounter_Bonuses"
-BONUS_HEADERS = ["Fecha", "Bono total"]
-
-# --- FUNCIONES DE LÓGICA DE NEGOCIO ---
-
-def get_bonus_type(day_of_week):
-    """Retorna la clave del tipo de bono basado en el día (0=Lunes, 6=Domingo)"""
-    if 0 <= day_of_week <= 3: 
-        return 'LUN_JUE'
-    elif day_of_week in (4, 5): 
-        return 'VIE_SAB'
-    elif day_of_week == 6: 
-        return 'DOM'
-    return None
-
-def calculate_current_bonus(records_today):
-    """Calcula el bono total aplicable para el día basado en el número de viajes."""
-    if not records_today:
-        return 0.0
-
-    try:
-        trip_date = datetime.strptime(records_today[0]["Fecha"], '%Y-%m-%d').date()
-    except Exception:
-        return 0.0
-        
-    day_of_week = trip_date.weekday()
-    num_trips = len(records_today)
-    
-    rules = BONUS_RULES.get(get_bonus_type(day_of_week), {})
-    total_bonus = 0.0
-    
-    # Sumar los bonos acumulativos al alcanzar las metas
-    sorted_goals = sorted(rules.keys())
-    
-    for goal in sorted_goals:
-        if num_trips >= goal:
-            total_bonus += rules[goal]
-
-    return total_bonus
-
-def update_daily_bonus_sheet(client, fecha, total_bonus):
-    """Guarda o actualiza el bono diario total en la hoja 'TripCounter_Bonuses'."""
-    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
-    
-    records = ws_bonuses.get_all_records()
-    found = False
-    
-    # Buscar si ya existe un registro para esa fecha para actualizarlo
-    for i, r in enumerate(records):
-        if str(r.get("Fecha")) == str(fecha):
-            # i+2: fila real; +1: columna de "Bono total"
-            row_index = i + 2 
-            col_index = BONUS_HEADERS.index("Bono total") + 1
-            ws_bonuses.update_cell(row_index, col_index, total_bonus)
-            found = True
-            break
-            
-    if not found:
-        # Añadir nueva fila si la fecha no existe
-        new_row = [fecha, total_bonus]
-        ws_bonuses.append_row(new_row)
-        
-    return total_bonus
-
 # ----------------------------
 # API: Trips (Ruta Unificada)
 # ----------------------------
@@ -283,18 +305,15 @@ def api_trips():
 
     client = get_gspread_client()
     ws_trips = ensure_sheet_with_headers(client, TRIPS_WS_NAME, TRIPS_HEADERS)
-    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS) # Solo para asegurar la creación si no existe
+    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
 
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
         
-        # 1. Obtener viajes del día
         all_trips = ws_trips.get_all_records()
         filtered_trips = [r for r in all_trips if str(r.get("Fecha")) == str(qdate)]
         
-        # 2. Obtener bono del día
         all_bonuses = ws_bonuses.get_all_records()
-        # next() busca el bono para la fecha, sino usa 0.0 por defecto
         current_bonus = next((float(r.get('Bono total', 0.0)) for r in all_bonuses if str(r.get("Fecha")) == str(qdate)), 0.0)
         
         return jsonify({"trips": filtered_trips, "bonus": current_bonus})
@@ -305,7 +324,6 @@ def api_trips():
     hora_inicio = str(body.get("hora_inicio","")).strip()
     hora_fin = str(body.get("hora_fin","")).strip()
     
-    # Validaciones de montos
     try:
         monto = float(body.get("monto", 0))
     except Exception:
@@ -321,50 +339,42 @@ def api_trips():
     aeropuerto_val = AIRPORT_FEE if aeropuerto_flag else 0.0 
     total = round(monto + propina + aeropuerto_val, 2)
 
-    # Obtener todos los viajes para calcular duplicados y número
     all_trips = ws_trips.get_all_records()
 
-    # Prevención de duplicados
     for r in all_trips:
         if str(r.get("Fecha")) == str(fecha) and str(r.get("Hora inicio")) == hora_inicio and str(r.get("Hora fin")) == hora_fin:
             return jsonify({"error":"duplicate"}), 409
 
-    # Cálculo del número de viaje
     same_date_count = sum(1 for r in all_trips if str(r.get("Fecha")) == str(fecha))
     numero = same_date_count + 1
 
-    # 1. Registrar el nuevo viaje
     row = [fecha, numero, hora_inicio, hora_fin, monto, propina, aeropuerto_val, total]
     ws_trips.append_row(row)
     app.logger.info(f"New trip appended: {row}")
     
-    # 2. Recalcular y actualizar el bono del día
-    # Volver a obtener la lista para asegurar que el registro POST esté incluido en el cálculo del bono
     all_trips_after_post = ws_trips.get_all_records()
     trips_today = [r for r in all_trips_after_post if str(r.get("Fecha")) == str(fecha)]
     
     current_bonus = calculate_current_bonus(trips_today)
     update_daily_bonus_sheet(client, fecha, current_bonus)
     
-    # Respuesta
     return jsonify({"status":"ok","trip":dict(zip(TRIPS_HEADERS,row)), "new_bonus": current_bonus}), 201
 
-# app.py (Nueva ruta)
-
+# ----------------------------
+# API: Expenses (Gastos)
+# ----------------------------
 @app.route("/api/expenses", methods=["GET", "POST"])
 def api_expenses():
     """
     GET: optional ?date=YYYY-MM-DD returns expenses for that date (defaults to today)
     POST: JSON with keys: fecha (optional), hora (optional), monto, categoria, descripcion
     """
-    # 1. Autenticación
     if not session.get('email'):
         return jsonify({"error":"not_authenticated"}), 401
 
     client = get_gspread_client()
     ws_gastos = ensure_sheet_with_headers(client, GASTOS_WS_NAME, GASTOS_HEADERS)
 
-    # --- Lógica GET (Recuperar Gastos del Día) ---
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
         
@@ -372,18 +382,14 @@ def api_expenses():
         filtered_expenses = [r for r in all_expenses if str(r.get("Fecha")) == str(qdate)]
         
         return jsonify(filtered_expenses)
-
-    # --- Lógica POST (Registrar Nuevo Gasto) ---
     
     body = request.get_json() or {}
     
-    # Recolección de datos, con valores por defecto
     fecha = body.get("fecha") or date.today().isoformat()
     hora = body.get("hora") or datetime.now().strftime('%H:%M')
     categoria = str(body.get("categoria", "")).strip()
     descripcion = str(body.get("descripcion", "")).strip()
     
-    # Validación del Monto
     try:
         monto = float(body.get("monto", 0))
         if monto <= 0:
@@ -391,26 +397,22 @@ def api_expenses():
     except Exception:
         return jsonify({"error": "monto_invalido", "message": "El monto debe ser numérico."}), 400
 
-    # 3. Registrar el nuevo gasto
     row = [fecha, hora, monto, categoria, descripcion]
     ws_gastos.append_row(row)
     app.logger.info(f"New expense appended: {row}")
     
-    # 4. Respuesta
     return jsonify({"status":"ok", "expense": dict(zip(GASTOS_HEADERS, row))}), 201
 
 
-
 # ----------------------------
-# API: Extras (similar but no propina/aeropuerto)
+# API: Extras
 # ----------------------------
 @app.route("/api/extras", methods=["GET","POST"])
 def api_extras():
     if not session.get('email'):
         return jsonify({"error":"not_authenticated"}), 401
     client = get_gspread_client()
-    headers = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Total"]
-    ws = ensure_sheet_with_headers(client, "TripCounter_Extras", headers)
+    ws = ensure_sheet_with_headers(client, EXTRAS_WS_NAME, EXTRAS_HEADERS)
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
         records = ws.get_all_records()
@@ -426,7 +428,6 @@ def api_extras():
     except Exception:
         monto = 0.0
 
-    # Prevent duplicates
     records = ws.get_all_records()
     for r in records:
         if str(r.get("Fecha")) == str(fecha) and str(r.get("Hora inicio")) == hi and str(r.get("Hora fin")) == hf:
@@ -438,18 +439,18 @@ def api_extras():
     row = [fecha, numero, hi, hf, monto, total]
     ws.append_row(row)
     app.logger.info(f"New extra appended: {row}")
-    return jsonify({"status":"ok","extra":dict(zip(headers,row))}), 201
+    return jsonify({"status":"ok","extra":dict(zip(EXTRAS_HEADERS,row))}), 201
 
 # ----------------------------
-# API: Presupuesto (create/list/mark paid)
+# API: Presupuesto
 # ----------------------------
 @app.route("/api/presupuesto", methods=["GET","POST","PUT"])
 def api_presupuesto():
     if not session.get('email'):
         return jsonify({"error":"not_authenticated"}), 401
     client = get_gspread_client()
-    headers = ["alias","categoria","monto","fecha_pago","pagado"]
-    ws = ensure_sheet_with_headers(client, "TripCounter_Presupuesto", headers)
+    # Usamos las constantes globales aquí
+    ws = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
 
     if request.method == "GET":
         records = ws.get_all_records()
@@ -463,9 +464,18 @@ def api_presupuesto():
         fecha_pago = body.get("fecha_pago")
         if not categoria or not fecha_pago:
             return jsonify({"error":"missing_fields"}), 400
+        
+        # Validación de Monto
+        try:
+            monto = float(monto)
+            if monto <= 0:
+                 return jsonify({"error": "monto_invalido", "message": "El monto debe ser un valor positivo."}), 400
+        except Exception:
+            return jsonify({"error": "monto_invalido", "message": "El monto debe ser numérico."}), 400
+
         row = [alias, categoria, monto, fecha_pago, "False"]
         ws.append_row(row)
-        return jsonify({"status":"ok","entry":dict(zip(headers,row))}), 201
+        return jsonify({"status":"ok","entry":dict(zip(PRESUPUESTO_HEADERS,row))}), 201
 
     # PUT -> mark as paid; expects 'row_index' (1-based)
     if request.method == "PUT":
@@ -474,15 +484,17 @@ def api_presupuesto():
         if not row_index:
             return jsonify({"error":"missing_row_index"}), 400
         try:
-            # set pagado column (5th) to True for given row
-            ws.update_cell(int(row_index), 5, "True")
+            # set pagado column (5th, index 5) to True for given row
+            ws.update_cell(int(row_index), PRESUPUESTO_HEADERS.index("pagado") + 1, "True")
             return jsonify({"status":"ok"}), 200
         except Exception as e:
-            return jsonify({"error":str(e)}), 500
+            app.logger.error(f"Error actualizando celda en GSheets: {e}")
+            return jsonify({"error":f"Error al actualizar la hoja: {e}"}), 500
 
 # ----------------------------
 # Run
 # ----------------------------
 if __name__ == "__main__":
     print("DEBUG: Flask app ejecutándose directamente")
-    #app.run(host="0.0.0.0", port=10000, debug=True)#
+    # Para ejecutar localmente, descomentar la siguiente línea
+    # app.run(host="0.0.0.0", port=10000, debug=True)
