@@ -1,4 +1,4 @@
-/* =========================================================
+8/* =========================================================
    scripts.js: Lógica de Interacción con la API de Flask
    ========================================================= */
 
@@ -299,3 +299,162 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// =========================================================
+// LÓGICA DE PRESUPUESTO (BUDGET)
+// =========================================================
+
+const budgetForm = document.getElementById('budget-form');
+const budgetListDiv = document.getElementById('budget-list');
+
+if (budgetForm) {
+    
+    // Función de renderizado (GET)
+    async function fetchAndDisplayBudget() {
+        if (budgetListDiv) {
+            budgetListDiv.innerHTML = 'Cargando presupuesto...';
+        }
+        try {
+            const response = await fetch('/api/presupuesto');
+            const records = await response.json();
+            
+            if (records.error) {
+                if (budgetListDiv) {
+                    budgetListDiv.innerHTML = `<div class="alert alert-danger">Error: ${records.error}</div>`;
+                }
+                return;
+            }
+
+            let html = '';
+            
+            if (records.length > 0) {
+                // Filtrar las entradas que corresponden al usuario autenticado (si alias es email)
+                // y luego mostrarlas. La API retorna todas, filtramos en el cliente.
+                // Usaremos un contador para obtener el row_index (Fila en GSheets)
+                let rowCount = 1; // Empezamos en 1 para omitir la cabecera
+                
+                html += `
+                    <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr><th>Categoría</th><th>Monto (USD)</th><th>Fecha de Pago</th><th>Estado</th><th>Acción</th></tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                records.forEach(entry => {
+                    rowCount++; // Fila actual en GSheets (usada para la acción PUT)
+                    const isPaid = entry.pagado === 'True';
+                    
+                    html += `
+                        <tr class="${isPaid ? 'table-success' : ''}">
+                            <td>${entry.categoria}</td>
+                            <td>$${parseFloat(entry.monto).toFixed(2)}</td>
+                            <td>${entry.fecha_pago}</td>
+                            <td>
+                                <span class="badge bg-${isPaid ? 'success' : 'warning'}">
+                                    ${isPaid ? 'Pagado' : 'Pendiente'}
+                                </span>
+                            </td>
+                            <td>
+                                ${!isPaid ? 
+                                    `<button data-row-index="${rowCount}" class="btn btn-sm btn-outline-success btn-mark-paid">Marcar Pagado</button>` 
+                                    : `<button class="btn btn-sm btn-success" disabled>✔️ Hecho</button>`
+                                }
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `</tbody></table></div>`;
+
+            } else {
+                html = '<div class="alert alert-info">Aún no hay categorías de presupuesto añadidas.</div>';
+            }
+            
+            if (budgetListDiv) {
+                budgetListDiv.innerHTML = html;
+                // Añadir listeners a los botones de "Marcar Pagado" después de renderizar
+                document.querySelectorAll('.btn-mark-paid').forEach(button => {
+                    button.addEventListener('click', handleMarkPaid);
+                });
+            }
+
+        } catch (error) {
+            console.error('Error al cargar el presupuesto:', error);
+            if (budgetListDiv) {
+                budgetListDiv.innerHTML = '<div class="alert alert-danger">Error al conectar con la API de presupuesto.</div>';
+            }
+        }
+    }
+    
+    // Función para manejar el evento PUT (Marcar como pagado)
+    async function handleMarkPaid(e) {
+        const row_index = e.currentTarget.getAttribute('data-row-index');
+        e.currentTarget.disabled = true;
+        e.currentTarget.textContent = 'Actualizando...';
+        
+        try {
+            const response = await fetch('/api/presupuesto', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ row_index: row_index })
+            });
+
+            if (response.ok) {
+                alert('¡Categoría marcada como pagada con éxito!');
+                fetchAndDisplayBudget(); // Recargar la lista para mostrar el cambio
+            } else {
+                const result = await response.json();
+                alert(`Error al marcar como pagado: ${result.error || response.statusText}`);
+                e.currentTarget.disabled = false;
+                e.currentTarget.textContent = 'Marcar Pagado';
+            }
+
+        } catch (error) {
+            console.error('Error de red al actualizar:', error);
+            alert('Error al conectar con el servidor.');
+            e.currentTarget.disabled = false;
+            e.currentTarget.textContent = 'Marcar Pagado';
+        }
+    }
+
+    // Manejar el envío del formulario (POST)
+    budgetForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const data = {
+            categoria: budgetForm.categoria.value,
+            monto: parseFloat(budgetForm.monto_pres.value), // Asegurar que apunta al ID correcto
+            fecha_pago: budgetForm.fecha_pago.value
+        };
+        
+        try {
+            const response = await fetch('/api/presupuesto', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert(`Categoría '${result.entry.categoria}' agregada al presupuesto.`);
+                
+                // Limpiar inputs del formulario
+                budgetForm.categoria.value = '';
+                budgetForm.monto_pres.value = '';
+                
+                fetchAndDisplayBudget(); // Recargar la lista
+            } else {
+                 alert(`Error al agregar presupuesto: ${result.error || response.statusText}`);
+            }
+            
+        } catch (error) {
+            console.error('Error de red:', error);
+            alert('Error al conectar con el servidor.');
+        }
+    });
+    
+    fetchAndDisplayBudget(); // Inicializar
+}
+
