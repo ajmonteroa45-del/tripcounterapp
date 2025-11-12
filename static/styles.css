@@ -4,6 +4,10 @@
   --text: #111827;
   --primary: #1034A6;
   --muted: #6b7280;
+  --success-bg: #d1fae5;
+  --success-text: #065f46;
+  --error-bg: #fee2e2;
+  --error-text: #991b1b;
 }
 
 body{
@@ -13,6 +17,7 @@ body{
   color: var(--text);
 }
 
+/* --- Layout --- */
 .topbar{
   display:flex;
   justify-content:space-between;
@@ -33,6 +38,7 @@ body{
   box-shadow: 0 1px 4px rgba(16,24,40,0.04);
 }
 
+/* --- Botones --- */
 .btn{
   display:inline-block;
   background:var(--primary);
@@ -42,10 +48,16 @@ body{
   text-decoration:none;
   border:none;
   cursor:pointer;
+  transition: background 0.2s;
+}
+
+.btn:hover{
+    background: #0d2a80; /* Tono más oscuro de --primary */
 }
 
 .btn.small{ padding:6px 10px; font-size:13px; }
 
+/* --- Navegación --- */
 .nav-links a{
   display:inline-block;
   margin-right:10px;
@@ -53,13 +65,67 @@ body{
   text-decoration:underline;
 }
 
+/* --- Formularios (Mejorado para consistencia y responsive) --- */
 label{ display:block; margin-bottom:8px; }
-input[type="text"], input[type="number"], input[type="time"], input[type="date"]{
+input[type="text"], 
+input[type="number"], 
+input[type="time"], 
+input[type="date"],
+select, /* Nuevo */
+textarea { /* Nuevo */
   display:block;
   padding:8px;
-  width:220px;
+  width:100%; /* Ajustado a 100% para mejor responsive */
   margin-top:6px;
   margin-bottom:10px;
   border-radius:6px;
   border:1px solid #e5e7eb;
+  box-sizing: border-box; /* Crucial para evitar que el padding desborde el ancho */
+}
+input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+
+/* --- Mensajes de Estado y Notificaciones (Nuevas Clases) --- */
+
+#message, .message-box {
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid #a7f3d0;
+}
+
+.error, .warning {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid #fecaca;
+}
+
+/* --- Estilo de Botón Específico para Recordatorios de Pago --- */
+.mark-paid-btn {
+  /* Estilo más discreto que el botón principal */
+  background: #f0f0f0;
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  margin-left: 10px;
+  cursor: pointer;
+}
+.mark-paid-btn:hover {
+  background: #e5e7eb;
+}
+.mark-paid-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
