@@ -338,6 +338,56 @@ def api_trips():
     # Respuesta
     return jsonify({"status":"ok","trip":dict(zip(TRIPS_HEADERS,row)), "new_bonus": current_bonus}), 201
 
+# app.py (Nueva ruta)
+
+@app.route("/api/expenses", methods=["GET", "POST"])
+def api_expenses():
+    """
+    GET: optional ?date=YYYY-MM-DD returns expenses for that date (defaults to today)
+    POST: JSON with keys: fecha (optional), hora (optional), monto, categoria, descripcion
+    """
+    # 1. Autenticación
+    if not session.get('email'):
+        return jsonify({"error":"not_authenticated"}), 401
+
+    client = get_gspread_client()
+    ws_gastos = ensure_sheet_with_headers(client, GASTOS_WS_NAME, GASTOS_HEADERS)
+
+    # --- Lógica GET (Recuperar Gastos del Día) ---
+    if request.method == "GET":
+        qdate = request.args.get("date") or date.today().isoformat()
+        
+        all_expenses = ws_gastos.get_all_records()
+        filtered_expenses = [r for r in all_expenses if str(r.get("Fecha")) == str(qdate)]
+        
+        return jsonify(filtered_expenses)
+
+    # --- Lógica POST (Registrar Nuevo Gasto) ---
+    
+    body = request.get_json() or {}
+    
+    # Recolección de datos, con valores por defecto
+    fecha = body.get("fecha") or date.today().isoformat()
+    hora = body.get("hora") or datetime.now().strftime('%H:%M')
+    categoria = str(body.get("categoria", "")).strip()
+    descripcion = str(body.get("descripcion", "")).strip()
+    
+    # Validación del Monto
+    try:
+        monto = float(body.get("monto", 0))
+        if monto <= 0:
+            return jsonify({"error": "monto_invalido", "message": "El monto debe ser un valor positivo."}), 400
+    except Exception:
+        return jsonify({"error": "monto_invalido", "message": "El monto debe ser numérico."}), 400
+
+    # 3. Registrar el nuevo gasto
+    row = [fecha, hora, monto, categoria, descripcion]
+    ws_gastos.append_row(row)
+    app.logger.info(f"New expense appended: {row}")
+    
+    # 4. Respuesta
+    return jsonify({"status":"ok", "expense": dict(zip(GASTOS_HEADERS, row))}), 201
+
 
 
 # ----------------------------
