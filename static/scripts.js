@@ -678,4 +678,131 @@ if (summaryResultsDiv) {
     summaryDateInput.addEventListener('change', () => fetchDailySummary());
 }
 
+// =========================================================
+// LÓGICA DE EXTRAS
+// =========================================================
+
+const extraForm = document.getElementById('extra-form');
+const extrasListDiv = document.getElementById('extras-list');
+const fechaExtraInput = document.getElementById('fecha_extra'); // Usamos el ID específico del formulario de extras
+
+if (extraForm) {
+    
+    // Función de renderizado (GET)
+    async function fetchAndDisplayExtras(date = fechaExtraInput.value) {
+        if (extrasListDiv) {
+            extrasListDiv.innerHTML = 'Cargando extras...';
+        }
+        try {
+            const response = await fetch(`/api/extras?date=${date}`);
+            const extras = await response.json();
+            
+            let html = '';
+            let totalExtras = 0;
+            
+            if (extras.error) {
+                if (extrasListDiv) {
+                    extrasListDiv.innerHTML = `<div class="alert alert-danger">Error: ${extras.error}</div>`;
+                }
+                return;
+            }
+
+            if (Array.isArray(extras) && extras.length > 0) {
+                // --- Construcción de la Tabla de Extras ---
+                html += `
+                    <p>Total de extras registrados: <strong>${extras.length}</strong></p>
+                    <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr><th>#</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Total</th></tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                extras.forEach(extra => {
+                    const monto = parseFloat(extra.Monto);
+                    totalExtras += monto;
+                    
+                    html += `
+                        <tr>
+                            <td>${extra.Numero}</td>
+                            <td>${extra['Hora inicio']}</td>
+                            <td>${extra['Hora fin']}</td>
+                            <td>${formatCurrency(monto)}</td>
+                            <td><strong>${formatCurrency(extra.Total)}</strong></td>
+                        </tr>
+                    `;
+                });
+                
+                html += `</tbody></table></div>`;
+
+                // --- Resumen de Extras ---
+                html += `
+                    <hr>
+                    <h4 class="text-end">Total de Ingresos Extra: 
+                        <strong class="text-primary">${formatCurrency(totalExtras)}</strong>
+                    </h4>
+                `;
+
+            } else {
+                html = '<div class="alert alert-info">No hay viajes extra registrados para este día.</div>';
+            }
+            
+            if (extrasListDiv) {
+                extrasListDiv.innerHTML = html;
+            }
+
+        } catch (error) {
+            console.error('Error al cargar los extras:', error);
+            if (extrasListDiv) {
+                extrasListDiv.innerHTML = '<div class="alert alert-danger">Error al conectar con la API de extras.</div>';
+            }
+        }
+    }
+
+    // Manejar el envío del formulario (POST)
+    extraForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const data = {
+            fecha: extraForm.fecha.value,
+            hora_inicio: extraForm.hora_inicio.value,
+            hora_fin: extraForm.hora_fin.value,
+            monto: parseFloat(extraForm.monto.value),
+        };
+        
+        try {
+            const response = await fetch('/api/extras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert(`Extra de ${formatCurrency(result.extra.Monto)} registrado con éxito.`);
+                
+                // Limpiar inputs del formulario
+                extraForm.hora_inicio.value = '';
+                extraForm.hora_fin.value = '';
+                extraForm.monto.value = '';
+                
+                // Recargar la lista para mostrar el nuevo extra
+                fetchAndDisplayExtras(data.fecha);
+            } else {
+                 alert(`Error al registrar el extra: ${result.error || response.statusText}`);
+            }
+            
+        } catch (error) {
+            console.error('Error de red:', error);
+            alert('Error al conectar con el servidor.');
+        }
+    });
+    
+    // Inicialización y cambio de fecha
+    fetchAndDisplayExtras();
+    fechaExtraInput.addEventListener('change', () => fetchAndDisplayExtras());
+}
+
+
 
