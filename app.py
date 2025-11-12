@@ -103,38 +103,47 @@ def get_gspread_client():
     client = gspread.authorize(credentials)
     return client
 
-# --- PLACEHOLDER CRÍTICO ---
+# app.py (Reemplaza la función ensure_sheet_with_headers con esta versión)
+
 def ensure_sheet_with_headers(client, ws_name, headers):
     """
-    ⚠️ REEMPLAZAR ESTA FUNCIÓN. 
-    Esta función es necesaria para que el código de la API funcione.
-    Debe abrir la Hoja de Cálculo (workbook) y luego obtener o crear la Hoja de Trabajo (worksheet) 
-    con el nombre 'ws_name', asegurando que tenga las 'headers' correctas.
+    Abre el Workbook (archivo) con el nombre 'ws_name' (ej: 'TripCounter_Trips')
+    y asegura que la primera fila contenga las cabeceras correctas.
     """
-    # Ejemplo de implementación (Ajustar a tu nombre de Hoja de Cálculo principal):
-    # workbook = client.open("NombreDeTuHojaPrincipal")
-    # try:
-    #     ws = workbook.worksheet(ws_name)
-    # except gspread.WorksheetNotFound:
-    #     ws = workbook.add_worksheet(title=ws_name, rows=100, cols=20)
-    #     ws.insert_row(headers, 1)
-    # return ws
-    
-    # Placeholder: Asumimos que la hoja 'Uber' es el workbook
-    try:
-        workbook = client.open("Uber") 
-    except gspread.WorksheetNotFound:
-        # Fallback si no encuentra el workbook por nombre (Ajustar)
-        raise Exception("No se encontró el Workbook 'Uber'.") 
+    WORKBOOK_NAME = ws_name # El nombre del archivo es ahora el nombre de la hoja (pestaña)
 
+    # 1. Abrir el Workbook (Archivo principal de Google Sheets)
     try:
-        ws = workbook.worksheet(ws_name)
+        # Abre el archivo por su nombre completo (ej: 'TripCounter_Trips')
+        workbook = client.open(WORKBOOK_NAME) 
     except gspread.WorksheetNotFound:
-        ws = workbook.add_worksheet(title=ws_name, rows=100, cols=20)
-        ws.insert_row(headers, 1)
+        # Este error ocurre si el archivo con ese nombre no existe o la cuenta de servicio no tiene acceso
+        app.logger.error(f"❌ ERROR: El archivo principal '{WORKBOOK_NAME}' no fue encontrado. Verifica el acceso de la Cuenta de Servicio.")
+        raise Exception(f"Error de configuración: Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos.")
         
+    # 2. Obtener la Pestaña (Worksheet)
+    # Asumimos que la hoja de trabajo principal es la primera (index 0)
+    # Si tienes varias pestañas dentro del archivo, tendrías que cambiar esto.
+    ws = workbook.get_worksheet(0)
+        
+    # 3. Asegurar que las Cabeceras son correctas
+    try:
+        current_headers = ws.row_values(1)
+        if current_headers != headers:
+            app.logger.warning(f"⚠️ Las cabeceras de '{WORKBOOK_NAME}' no coinciden. Sobrescribiendo.")
+            # Borrar la primera fila y reinsertar las correctas
+            ws.delete_rows(1)
+            ws.insert_row(headers, 1)
+    except Exception as e:
+        app.logger.error(f"Error al verificar cabeceras en {WORKBOOK_NAME}: {e}")
+        # Intentar insertar si hay problemas, asumiendo que estaba vacío
+        try:
+            ws.insert_row(headers, 1)
+        except:
+            pass 
+
     return ws
-# --- FIN PLACEHOLDER CRÍTICO ---
+
 
 
 # ----------------------------
