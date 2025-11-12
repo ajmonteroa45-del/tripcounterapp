@@ -588,6 +588,83 @@ def api_kilometraje():
     else:
         return jsonify({"error": "accion_invalida", "message": "La acción debe ser 'start' o 'end'."}), 400
 
+# app.py (Añadir en la sección de FUNCIONES DE LÓGICA DE NEGOCIO)
+
+def calculate_daily_summary(client, target_date):
+    """
+    Calcula los totales de Ingresos, Egresos y Kilometraje para una fecha dada.
+    target_date debe ser un string en formato YYYY-MM-DD.
+    """
+    # 1. Obtener datos de Viajes e Ingresos (Trips)
+    ws_trips = ensure_sheet_with_headers(client, TRIPS_WS_NAME, TRIPS_HEADERS)
+    trips_records = ws_trips.get_all_records()
+    trips_today = [r for r in trips_records if str(r.get("Fecha")) == str(target_date)]
+    
+    total_gross_income = sum(float(r.get("Total", 0)) for r in trips_today)
+    total_tips = sum(float(r.get("Propina", 0)) for r in trips_today)
+    num_trips = len(trips_today)
+
+    # 2. Obtener datos de Gastos
+    ws_gastos = ensure_sheet_with_headers(client, GASTOS_WS_NAME, GASTOS_HEADERS)
+    gastos_records = ws_gastos.get_all_records()
+    gastos_today = [r for r in gastos_records if str(r.get("Fecha")) == str(target_date)]
+    
+    total_expenses = sum(float(r.get("Monto", 0)) for r in gastos_today)
+
+    # 3. Obtener datos de Kilometraje
+    ws_km = ensure_sheet_with_headers(client, KM_WS_NAME, KM_HEADERS)
+    km_records = ws_km.get_all_records()
+    km_record = next((r for r in km_records if str(r.get("Fecha")) == str(target_date)), None)
+    
+    total_km_recorrido = int(km_record.get("Recorrido", 0)) if km_record else 0
+
+    # 4. Calcular el Ingreso Neto y la Productividad
+    
+    # Bono del día (Necesitamos obtenerlo de la hoja de Bonos)
+    ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
+    bonus_records = ws_bonuses.get_all_records()
+    current_bonus = next((float(r.get('Bono total', 0.0)) for r in bonus_records if str(r.get("Fecha")) == str(target_date)), 0.0)
+
+    # Ingreso total (Viajes + Bono)
+    total_income = total_gross_income + current_bonus
+    
+    # Ingreso Neto: (Ingreso Total - Gastos)
+    net_income = total_income - total_expenses
+    
+    # Productividad (Soles por KM): Si hay KM recorrido, dividimos
+    productivity_per_km = net_income / total_km_recorrido if total_km_recorrido > 0 else 0.0
+    
+    return {
+        "fecha": target_date,
+        "num_trips": num_trips,
+        "total_income": round(total_income, 2),
+        "total_expenses": round(total_expenses, 2),
+        "net_income": round(net_income, 2),
+        "total_km": total_km_recorrido,
+        "productivity_per_km": round(productivity_per_km, 2),
+        "is_complete": num_trips > 0 and total_km_recorrido > 0 # Bandera para saber si el día está completo
+    }
+# app.py (Añadir a la sección de APIs)
+
+@app.route("/api/summary", methods=["GET"])
+def api_summary():
+    """
+    GET: optional ?date=YYYY-MM-DD returns the productivity summary for that day.
+    """
+    if not session.get('email'):
+        return jsonify({"error":"not_authenticated"}), 401
+
+    client = get_gspread_client()
+    target_date = request.args.get("date") or date.today().isoformat()
+    
+    try:
+        summary_data = calculate_daily_summary(client, target_date)
+        return jsonify(summary_data)
+    except Exception as e:
+        app.logger.error(f"Error generando resumen: {e}")
+        return jsonify({"error": "Error interno al calcular el resumen."}), 500
+
+
 
 # ----------------------------
 # Run
