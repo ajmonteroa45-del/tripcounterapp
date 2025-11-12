@@ -1,16 +1,18 @@
 {% extends "base.html" %}
+
+{% block title %}Resumen Diario{% endblock %}
+
 {% block content %}
-<div class="card">
-  <h3>Resúmenes</h3>
-  {% if files %}
-    <ul>
-      {% for f in files %}
-        <li><a href="{{ url_for('view_summary', filename=f) }}">{{ f }}</a></li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>No hay resúmenes guardados.</p>
-  {% endif %}
-  <a class="btn" href="{{ url_for('index') }}">Volver</a>
+<div class="container mt-4">
+    <h2 class="mb-4">🔍 Resumen de Productividad</h2>
+
+    <label>Fecha del Resumen:
+        <input type="date" name="fecha" id="summary_fecha" class="form-control" 
+               value="{{ (datetime.utcnow().date()).isoformat() }}">
+    </label>
+
+    <div id="summary-results" class="mt-4">
+        Cargando resumen...
+    </div>
 </div>
 {% endblock %}
