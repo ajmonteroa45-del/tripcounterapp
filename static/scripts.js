@@ -805,4 +805,159 @@ if (extraForm) {
 }
 
 
+// --- LÓGICA ESPECÍFICA PARA EXPORTACIÓN (Añadir al final de script.js) ---
 
+// URL de Producción para la API del reporte
+const PRODUCTION_DOMAIN = 'https://www.tripcounter.online'; 
+const REPORT_API_URL = `${PRODUCTION_DOMAIN}/api/monthly_report`; 
+
+
+// Se ejecuta al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (Aquí el resto de tu lógica global) ...
+    
+    // Inicializar la lógica específica del reporte si los elementos existen
+    if (document.getElementById('reportForm')) {
+        initializeReportPage();
+    }
+});
+
+
+function initializeReportPage() {
+    // 1. Obtener Referencias del DOM
+    const reportForm = document.getElementById('reportForm');
+    const submitButton = document.getElementById('submitButton');
+    const monthSelect = document.getElementById('month');
+    const yearInput = document.getElementById('year');
+    const messageDiv = document.getElementById('message');
+    const reportOutputDiv = document.getElementById('reportOutput');
+
+    // 2. Rellenar dinámicamente el selector de Meses y Año
+    function populateMonths() {
+        const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        months.forEach((name, index) => {
+            const option = document.createElement('option');
+            option.value = index + 1; 
+            option.textContent = name;
+            monthSelect.appendChild(option);
+        });
+        
+        // Establecer el mes anterior por defecto
+        const today = new Date();
+        let prevMonth = today.getMonth(); 
+        let prevYear = today.getFullYear();
+
+        if (prevMonth === 0) {
+            prevMonth = 11;
+            prevYear -= 1;
+        } else {
+            prevMonth -= 1;
+        }
+
+        monthSelect.value = prevMonth + 1;
+        yearInput.value = prevYear;
+    }
+    
+    // 3. Manejador de Envío del Formulario
+    reportForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        generateReport();
+    });
+    
+    // 4. Función Principal de Llamada a la API
+    async function generateReport() {
+        const month = monthSelect.value;
+        const year = yearInput.value;
+
+        // Limpiar mensajes y resultados previos
+        messageDiv.innerHTML = '';
+        reportOutputDiv.innerHTML = '';
+        
+        messageDiv.innerHTML = '⚙️ Solicitando y calculando reporte mensual...';
+        messageDiv.className = '';
+        submitButton.disabled = true;
+
+        const FETCH_URL = `${REPORT_API_URL}?month=${month}&year=${year}`;
+
+        try {
+            const response = await fetch(FETCH_URL, {
+                // 'include' es clave para enviar las cookies de sesión (autenticación)
+                credentials: 'include' 
+            });
+            const data = await response.json();
+
+            // Manejo de Errores (401, 400, 500, etc.)
+            if (!response.ok || data.error) {
+                let errorMessage;
+                if (response.status === 401) {
+                     errorMessage = "No autenticado. Por favor, asegúrate de haber iniciado sesión previamente.";
+                } else if (data.error) {
+                    errorMessage = `Error de API: ${data.message || data.error}`; 
+                } else {
+                    errorMessage = `Error HTTP: ${response.status} - ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            displayReportSummary(data.report);
+            
+        } catch (error) {
+            console.error('Error al generar el reporte:', error);
+            messageDiv.innerHTML = `❌ Error: ${error.message}`;
+            messageDiv.className = 'error';
+        } finally {
+            submitButton.disabled = false;
+        }
+    }
+
+    // 5. Función para Mostrar el Resultado en la Página
+    function displayReportSummary(report) {
+        const monthName = monthSelect.options[monthSelect.selectedIndex].text;
+        
+        messageDiv.innerHTML = `✅ Reporte de **${monthName} de ${report.year}** generado y guardado.`;
+        messageDiv.className = 'success';
+
+        let html = `<h3>Resumen de ${monthName}, ${report.year}</h3>`;
+        html += `<table class="summary-table">`;
+        
+        const formatValue = (label, value) => {
+            if (typeof value === 'number') {
+                if (label.includes('S/') || label.includes('Ganancia')) {
+                    return `S/ ${value.toFixed(2)}`;
+                }
+                if (label.includes('Kilómetros')) {
+                    return `${value.toLocaleString('es-PE')} KM`;
+                }
+                return value.toLocaleString('es-PE');
+            }
+            return value;
+        };
+
+        const fields = [
+            ["Ingreso Total (Viajes + Bono)", report.total_gross_income + report.total_bonus],
+            ["Bono Total", report.total_bonus],
+            ["Gasto Total", report.total_expenses],
+            ["Ganancia Neta", report.net_income],
+            ["Kilómetros Recorridos", report.total_km],
+            ["Viajes Totales", report.total_trips],
+            ["Productividad S/KM", report.productivity_per_km],
+        ];
+
+        fields.forEach(([label, value]) => {
+            html += `<tr><th>${label}</th><td>${formatValue(label, value)}</td></tr>`;
+        });
+
+        html += `</table>`;
+        
+        if (report.save_error) {
+             html += `<p class="error" style="margin-top: 15px;">⚠️ Advertencia: Error al guardar el resumen histórico en Google Sheets. Detalle: ${report.save_error}</p>`;
+        }
+
+        reportOutputDiv.innerHTML = html;
+    }
+
+    // Ejecutar inicialización
+    populateMonths();
+}
+ 
