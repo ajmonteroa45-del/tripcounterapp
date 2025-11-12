@@ -5,7 +5,7 @@ import os
 import json
 import logging
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import service_account
@@ -70,6 +70,23 @@ EXTRAS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Total"]
 # Kilometraje (Añadir a la lista)
 KM_WS_NAME = "TripCounter_Kilometraje"
 KM_HEADERS = ["Fecha", "KM Inicio", "KM Fin", "Recorrido", "Notas"]
+
+# --- CONSTANTES DE HOJAS DE CÁLCULO ---
+# ... (otras constantes) ...
+# Resúmenes Históricos (Añadir a la lista)
+SUMMARIES_WS_NAME = "TripCounter_Summaries"
+SUMMARIES_HEADERS = [
+    "Fecha",
+    "Mes",
+    "Año",
+    "KM Recorrido",
+    "Viajes Totales",
+    "Ingreso Bruto",
+    "Bono Total",
+    "Gasto Total",
+    "Ganancia Neta",
+    "Productividad S/KM"
+]
 
 # ----------------------------
 # Debug inicial visible en Render logs
@@ -663,6 +680,136 @@ def api_summary():
     except Exception as e:
         app.logger.error(f"Error generando resumen: {e}")
         return jsonify({"error": "Error interno al calcular el resumen."}), 500
+
+# app.py (Nueva ruta de API)
+
+@app.route("/api/monthly_report", methods=["GET"])
+def api_monthly_report():
+    """
+    GET: Requiere ?month=MM&year=YYYY. Calcula el reporte del mes y lo guarda en TripCounter_Summaries.
+    """
+    if not session.get('email'):
+        return jsonify({"error":"not_authenticated"}), 401
+
+    month = request.args.get("month")
+    year = request.args.get("year")
+    
+    if not month or not year:
+        return jsonify({"error": "missing_fields", "message": "Faltan los parámetros 'month' y 'year'."}), 400
+        
+    try:
+        month = int(month)
+        year = int(year)
+    except ValueError:
+        return jsonify({"error": "invalid_format", "message": "Month y Year deben ser números."}), 400
+
+    client = get_gspread_client()
+    
+    # 1. Determinar el rango de fechas del mes
+    try:
+        # Crea la fecha de inicio del mes
+        start_date = date(year, month, 1)
+        # Calcula la fecha de fin del mes (el día anterior al primer día del siguiente mes)
+        if month == 12:
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
+    except ValueError:
+        return jsonify({"error": "invalid_date", "message": "Mes o año inválido."}), 400
+
+    # 2. Iterar por cada día del mes y consolidar datos
+    
+    # Inicializar contadores mensuales
+    monthly_summary = {
+        "month": month,
+        "year": year,
+        "total_km": 0.0,
+        "total_trips": 0,
+        "total_gross_income": 0.0, # Ingreso de viajes sin bono
+        "total_bonus": 0.0,
+        "total_expenses": 0.0,
+        "net_income": 0.0,
+    }
+    
+    current_date = start_date
+    daily_data = [] # Para almacenar el detalle diario
+    
+    while current_date <= end_date:
+        date_str = current_date.isoformat()
+        try:
+            # Reutiliza la función de cálculo diario
+            day_summary = calculate_daily_summary(client, date_str)
+            
+            # Sumar al resumen mensual
+            monthly_summary["total_km"] += day_summary["total_km"]
+            monthly_summary["total_trips"] += day_summary["num_trips"]
+            monthly_summary["total_gross_income"] += day_summary["total_income"] - day_summary["current_bonus"] # Requiere un ajuste si day_summary no retorna el bono por separado
+            monthly_summary["total_bonus"] += day_summary["current_bonus"]
+            monthly_summary["total_expenses"] += day_summary["total_expenses"]
+            
+            daily_data.append(day_summary)
+
+        except Exception as e:
+            app.logger.warning(f"Error procesando el día {date_str}: {e}")
+            pass
+            
+        current_date += timedelta(days=1)
+
+    # 3. Cálculo Final y Productividad Mensual
+    monthly_summary["net_income"] = monthly_summary["total_gross_income"] + monthly_summary["total_bonus"] - monthly_summary["total_expenses"]
+    
+    total_income_with_bonus = monthly_summary["total_gross_income"] + monthly_summary["total_bonus"]
+    
+    productivity_per_km = monthly_summary["net_income"] / monthly_summary["total_km"] if monthly_summary["total_km"] > 0 else 0.0
+    
+    monthly_summary["productivity_per_km"] = round(productivity_per_km, 2)
+    
+    # 4. Guardar en TripCounter_Summaries (Histórico)
+    try:
+        ws_summaries = ensure_sheet_with_headers(client, SUMMARIES_WS_NAME, SUMMARIES_HEADERS)
+        
+        # Formato de fecha para el resumen (ej: 2025-11-01)
+        summary_date_str = start_date.isoformat()
+        
+        # Buscar si ya existe un registro para este mes/año y actualizarlo (lógica similar a update_daily_bonus_sheet)
+        records = ws_summaries.get_all_records()
+        
+        existing_row_index = -1
+        for i, r in enumerate(records):
+            if str(r.get("Mes")) == str(month) and str(r.get("Año")) == str(year):
+                existing_row_index = i + 2 
+                break
+        
+        row_data = [
+            summary_date_str,
+            month,
+            year,
+            monthly_summary["total_km"],
+            monthly_summary["total_trips"],
+            round(monthly_summary["total_gross_income"] + monthly_summary["total_bonus"], 2), # Ingreso total con bono
+            round(monthly_summary["total_bonus"], 2),
+            round(monthly_summary["total_expenses"], 2),
+            round(monthly_summary["net_income"], 2),
+            productivity_per_km
+        ]
+        
+        if existing_row_index > 0:
+            # Actualizar fila existente
+            ws_summaries.update(f'A{existing_row_index}', [row_data])
+            app.logger.info(f"Reporte mensual actualizado para {month}/{year}")
+        else:
+            # Añadir nueva fila
+            ws_summaries.append_row(row_data)
+            app.logger.info(f"Reporte mensual guardado para {month}/{year}")
+
+    except Exception as e:
+        app.logger.error(f"Error al guardar el resumen en Sheets: {e}")
+        # El reporte se devuelve al usuario, pero se advierte del error de guardado.
+        monthly_summary["save_error"] = str(e)
+
+
+    # 5. Devolver el reporte al Frontend
+    return jsonify({"report": monthly_summary, "details": daily_data}), 200
 
 
 
