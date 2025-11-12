@@ -1,16 +1,31 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="card">
-  <h3>Exportar</h3>
-  {% if csv_exists %}
-    <p><a class="btn" href="{{ url_for('download_csv') }}">📥 Descargar CSV de viajes</a></p>
-  {% else %}
-    <p>No hay registro de viajes.</p>
-  {% endif %}
-  {% if gastos_exists %}
-    <p><a class="btn" href="{{ url_for('download_gastos') }}">📥 Descargar CSV de gastos</a></p>
-  {% endif %}
-  <p><a class="btn" href="{{ url_for('clear_all') }}">Vaciar todos los registros</a></p>
-  <a class="btn" href="{{ url_for('index') }}">Volver</a>
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Reporte Mensual</title>
+    <link rel="stylesheet" href="static/export.css">
+</head>
+<body>
+
+    <div class="container">
+        <h2>Generar Reporte Mensual de Productividad</h2>
+
+        <form id="reportForm">
+            <label for="month">Mes:</label>
+            <select id="month" required>
+                </select>
+
+            <label for="year">Año:</label>
+            <input type="number" id="year" required min="2020" max="2050">
+            
+            <button type="submit" id="submitButton">Generar Reporte</button>
+        </form>
+
+        <div id="message"></div>
+        <div id="reportOutput"></div>
+    </div>
+
+    <script src="static/script.js"></script> 
+</body>
+</html>
