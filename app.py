@@ -359,7 +359,7 @@ def index():
 def viajes_page():
     if not session.get('email'):
         return redirect(url_for("login"))
-    return render_template("viajes.html", email=session.get('email'))
+    return render_template("trips.html", email=session.get('email'))
 
 @app.route("/extras")
 def extras_page():
