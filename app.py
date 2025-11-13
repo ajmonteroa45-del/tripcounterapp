@@ -81,7 +81,8 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        for key in ["SERVICE_ACCOUNT_B64", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
+        # Eliminamos SERVICE_ACCOUNT_B64 y revisamos una clave GSPREAD clave
+        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
 
@@ -90,20 +91,34 @@ def startup_debug():
 # ----------------------------
 def get_gspread_client():
     """
-    Establece la conexión con Google Sheets usando las credenciales Base64.
+    Establece la conexión con Google Sheets reconstruyendo el JSON
+    a partir de variables de entorno individuales (GSPREAD_*).
     """
-    b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
-    app.logger.info("DEBUG: SERVICE_ACCOUNT_B64 presente: %s", bool(b64_credentials))
-
-    if not b64_credentials:
-        # Aquí relanzamos un error explícito si las credenciales no están
-        raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
+    # 1. Verificar la existencia de las variables clave
+    if not os.getenv("GSPREAD_PRIVATE_KEY") or not os.getenv("GSPREAD_CLIENT_EMAIL"):
+        app.logger.error("❌ ERROR CRÍTICO DE CREDENCIALES: Faltan variables GSPREAD_PRIVATE_KEY o GSPREAD_CLIENT_EMAIL.")
+        raise Exception("Error de configuración: Faltan variables de credenciales GSPREAD.")
 
     try:
-        cleaned_b64 = b64_credentials.strip() 
-        credentials_json = base64.b64decode(cleaned_b64).decode("utf-8")
-        creds_dict = json.loads(credentials_json)
-
+        # 2. Reconstruir el diccionario de credenciales
+        # Nota: Usamos .get() para las claves menos críticas, aunque idealmente todas deberían estar.
+        private_key = os.getenv("GSPREAD_PRIVATE_KEY")
+        # Esto maneja el caso de que los saltos de línea se hayan copiado como caracteres literales '\n'
+        cleaned_private_key = private_key.replace("\\n", "\n") 
+        
+        creds_dict = {
+            "type": os.getenv("GSPREAD_TYPE", "service_account"),
+            "project_id": os.getenv("GSPREAD_PROJECT_ID"),
+            "private_key_id": os.getenv("GSPREAD_PRIVATE_KEY_ID"),
+            "private_key": cleaned_private_key, 
+            "client_email": os.getenv("GSPREAD_CLIENT_EMAIL"),
+            "client_id": os.getenv("GSPREAD_CLIENT_ID"),
+            "auth_uri": os.getenv("GSPREAD_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": os.getenv("GSPREAD_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": os.getenv("GSPREAD_AUTH_CERT_URL"),
+            "client_x509_cert_url": os.getenv("GSPREAD_CLIENT_CERT_URL"),
+        }
+        
         credentials = Credentials.from_service_account_info(
             creds_dict,
             scopes=[
@@ -116,8 +131,8 @@ def get_gspread_client():
         return client
     
     except Exception as e:
-        app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la decodificación o parseo JSON. Detalle: {e}")
-        raise Exception(f"Error de credenciales GSheets. Verifica SERVICE_ACCOUNT_B64.")
+        app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la reconstrucción o autorización. Detalle: {e}")
+        raise Exception(f"Error de credenciales GSheets: {e}")
 
 
 def ensure_sheet_with_headers(client, ws_name, headers):
@@ -126,13 +141,17 @@ def ensure_sheet_with_headers(client, ws_name, headers):
     """
     WORKBOOK_NAME = ws_name 
     try:
+        # 1. Abrir el Workbook (Archivo principal de Google Sheets)
         workbook = client.open(WORKBOOK_NAME) 
     except gspread.WorksheetNotFound:
-        app.logger.error(f"❌ ERROR: El archivo principal '{WORKBOOK_NAME}' no fue encontrado. Verifica el acceso.")
+        # Este error ocurre si el archivo con ese nombre no existe o la cuenta de servicio no tiene acceso
+        app.logger.error(f"❌ ERROR: El archivo principal '{WORKBOOK_NAME}' no fue encontrado. Verifica el acceso de la Cuenta de Servicio.")
         raise gspread.WorksheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos.")
         
+    # 2. Obtener la Pestaña (Worksheet)
     ws = workbook.get_worksheet(0)
         
+    # 3. Asegurar que las Cabeceras son correctas
     try:
         current_headers = ws.row_values(1)
         if current_headers != headers:
@@ -257,7 +276,7 @@ def calculate_daily_summary(client, target_date):
         "total_expenses": round(total_expenses, 2),
         "net_income": round(net_income, 2),
         "total_km": total_km_recorrido,
-        "current_bonus": round(current_bonus, 2), # Añadido para mejor reporte
+        "current_bonus": round(current_bonus, 2),
         "productivity_per_km": round(productivity_per_km, 2),
         "is_complete": num_trips > 0 and total_km_recorrido > 0
     }
@@ -290,7 +309,7 @@ def oauth2callback():
         session['email'] = userinfo.get('email')
         app.logger.info(f"User logged in: {session.get('email')}")
         
-        # --- LÓGICA DE VERIFICACIÓN DE NUEVO USUARIO (Se mantiene la lógica correcta) ---
+        # --- LÓGICA DE VERIFICACIÓN DE NUEVO USUARIO ---
         client = get_gspread_client()
         ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
         
@@ -302,7 +321,6 @@ def oauth2callback():
         except gspread.exceptions.CellNotFound:
             is_new_user = True
         except Exception as e:
-            # Error de conexión GSheets: registramos el error y asumimos usuario existente
             app.logger.error(f"Error al verificar existencia de usuario: {e}")
             is_new_user = False 
 
@@ -345,33 +363,28 @@ def index():
             
             today = date.today()
             
-            # Recorrido de los records para generar recordatorios
             for i, r in enumerate(records):
                 try:
                     date_str = r.get("fecha_pago")
-                    # Se añade una robustez extra para fechas vacías o mal formateadas
                     if not date_str or not date_str.strip():
                         continue 
                         
                     fp = datetime.strptime(date_str, "%Y-%m-%d").date()
                     
                 except Exception:
-                    # Captura si el formato de la fecha es incorrecto o no se puede parsear (ej: ValueError)
                     continue
                 
                 days_left = (fp - today).days
                 
-                # Se salta si ya está pagado (se revisa el valor exacto)
                 if str(r.get("pagado")).lower() == "true":
                     continue
                 
                 reminder_data = {
                     "categoria": r.get("categoria"),
                     "monto": r.get("monto"),
-                    "row_index": i + 2  # Índice de la fila en GSheets (1-based, saltando cabecera)
+                    "row_index": i + 2
                 }
                 
-                # Reglas de recordatorio
                 if days_left == 3:
                     reminder_data["type"] = "3days"
                     reminders.append(reminder_data)
@@ -380,15 +393,13 @@ def index():
                     reminders.append(reminder_data)
                     
         except Exception as e:
-            # Captura errores al leer la hoja (ej: WorksheetNotFound)
             app.logger.error(f"❌ Error cargando recordatorios desde la hoja: {e}")
             flash(f'⚠️ Error al cargar los recordatorios: {e}', 'warning')
 
     except Exception as e:
-        # Captura errores críticos de conexión (credenciales, WorkBook no encontrado)
         app.logger.error(f"❌ Error CRÍTICO conectando a GSheets/Credenciales: {e}")
-        flash('🛑 Error de conexión a Google Sheets. Los datos pueden estar incompletos. Revisa tu SERVICE_ACCOUNT_B64 y permisos.', 'danger')
-        reminders = [] # Asegura que reminders esté vacío si hay fallo crítico
+        flash('🛑 Error de conexión a Google Sheets. Los datos pueden estar incompletos. Revisa tus variables GSPREAD.', 'danger')
+        reminders = []
 
     return render_template("home.html", email=email, reminders=reminders)
 
@@ -397,7 +408,6 @@ def index():
 def viajes_page():
     if not session.get('email'):
         return redirect(url_for("login"))
-    # CORRECCIÓN: Cambiado de 'viajes.html' a 'trips.html'
     return render_template("trips.html", email=session.get('email'))
 
 @app.route("/extras")
