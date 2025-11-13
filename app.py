@@ -106,68 +106,34 @@ def startup_debug():
 # Google Sheets Client & Utilitarios
 # ----------------------------
 def get_gspread_client():
-    # ... (Tu código para obtener el cliente de GSpread) ...
     b64_credentials = os.getenv("SERVICE_ACCOUNT_B64")
     print("DEBUG: SERVICE_ACCOUNT_B64 presente:", bool(b64_credentials))
 
     if not b64_credentials:
         raise FileNotFoundError("Variable SERVICE_ACCOUNT_B64 no encontrada en Render")
 
-    credentials_json = base64.b64decode(b64_credentials).decode("utf-8")
-    creds_dict = json.loads(credentials_json)
-
-    credentials = Credentials.from_service_account_info(
-        creds_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file"
-        ]
-    )
-
-    client = gspread.authorize(credentials)
-    return client
-
-# app.py (Reemplaza la función ensure_sheet_with_headers con esta versión)
-
-def ensure_sheet_with_headers(client, ws_name, headers):
-    """
-    Abre el Workbook (archivo) con el nombre 'ws_name' (ej: 'TripCounter_Trips')
-    y asegura que la primera fila contenga las cabeceras correctas.
-    """
-    WORKBOOK_NAME = ws_name # El nombre del archivo es ahora el nombre de la hoja (pestaña)
-
-    # 1. Abrir el Workbook (Archivo principal de Google Sheets)
     try:
-        # Abre el archivo por su nombre completo (ej: 'TripCounter_Trips')
-        workbook = client.open(WORKBOOK_NAME) 
-    except gspread.WorksheetNotFound:
-        # Este error ocurre si el archivo con ese nombre no existe o la cuenta de servicio no tiene acceso
-        app.logger.error(f"❌ ERROR: El archivo principal '{WORKBOOK_NAME}' no fue encontrado. Verifica el acceso de la Cuenta de Servicio.")
-        raise Exception(f"Error de configuración: Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos.")
+        # CORRECCIÓN CLAVE: Eliminamos espacios en blanco/saltos de línea antes de decodificar
+        cleaned_b64 = b64_credentials.strip() 
         
-    # 2. Obtener la Pestaña (Worksheet)
-    # Asumimos que la hoja de trabajo principal es la primera (index 0)
-    # Si tienes varias pestañas dentro del archivo, tendrías que cambiar esto.
-    ws = workbook.get_worksheet(0)
-        
-    # 3. Asegurar que las Cabeceras son correctas
-    try:
-        current_headers = ws.row_values(1)
-        if current_headers != headers:
-            app.logger.warning(f"⚠️ Las cabeceras de '{WORKBOOK_NAME}' no coinciden. Sobrescribiendo.")
-            # Borrar la primera fila y reinsertar las correctas
-            ws.delete_rows(1)
-            ws.insert_row(headers, 1)
+        credentials_json = base64.b64decode(cleaned_b64).decode("utf-8")
+        creds_dict = json.loads(credentials_json)
+
+        credentials = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=[
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive.file"
+            ]
+        )
+
+        client = gspread.authorize(credentials)
+        return client
+    
     except Exception as e:
-        app.logger.error(f"Error al verificar cabeceras en {WORKBOOK_NAME}: {e}")
-        # Intentar insertar si hay problemas, asumiendo que estaba vacío
-        try:
-            ws.insert_row(headers, 1)
-        except:
-            pass 
-
-    return ws
-
+        # Cambiamos el error genérico por uno más claro en el log
+        app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la decodificación o parseo JSON. Detalle: {e}")
+        raise Exception(f"Error de credenciales GSheets. Verifica SERVICE_ACCOUNT_B64.")
 
 
 # ----------------------------
