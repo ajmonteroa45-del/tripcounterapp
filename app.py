@@ -3,8 +3,8 @@ import time
 import json
 import logging
 import sys
-import traceback 
-from datetime import date, datetime, timedelta # Asegúrate de que 'date' esté importado
+import traceback
+from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import service_account
@@ -13,6 +13,7 @@ import base64
 from google.oauth2.service_account import Credentials
 import gspread.exceptions
 
+# ... el resto del código continúa desde el bloque CONFIG / LOGGING
 # ----------------------------
 # CONFIG / LOGGING
 # ----------------------------
