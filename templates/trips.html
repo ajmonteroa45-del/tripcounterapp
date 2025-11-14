@@ -1,153 +1,55 @@
-/* --- En tu archivo JS o dentro de <script> en viajes.html --- */
-document.addEventListener('DOMContentLoaded', function() {
-    const tripForm = document.getElementById('trip-form');
-    const tripsListDiv = document.getElementById('trips-list');
-    const fechaInput = document.getElementById('fecha');
-    
-    // Función de utilidad para formatear números como moneda S/
-    function formatCurrency(value) {
-        // Asegura que es un número y lo formatea a 2 decimales
-        return `S/${parseFloat(value).toFixed(2)}`;
-    }
+{% extends "base.html" %}
 
-    // 1. Obtener y mostrar los viajes y el bono del día (Lógica GET)
-    async function fetchAndDisplayTrips(date = fechaInput.value) {
-        tripsListDiv.innerHTML = 'Cargando...';
-        try {
-            // Petición GET a la API con la fecha actual o seleccionada
-            const response = await fetch(`/api/trips?date=${date}`);
-            const data = await response.json();
-            
-            if (response.status !== 200) {
-                 tripsListDiv.innerHTML = `<div class="alert alert-danger">Error al cargar: ${data.error || 'API Error'}</div>`;
-                return;
-            }
+{% block title %}Registrar Viajes{% endblock %}
 
-            const trips = data.trips;
-            // El bono total ya viene calculado desde Flask
-            const bonus = parseFloat(data.bonus || 0); 
-            
-            let html = '';
-            
-            if (trips.length > 0) {
-                // --- Construcción de la Tabla de Viajes ---
-                html += `
-                    <p>Total de servicios hoy: <strong>${trips.length}</strong></p>
-                    <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr><th>#</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Propina</th><th>Aerop.</th><th>Total</th></tr>
-                        </thead>
-                        <tbody>
-                `;
-                let totalMonto = 0;
-                let totalPropina = 0;
-                let totalDiaViajes = 0; // Total de solo viajes (Monto + Propina + Aerop.)
+{% block content %}
+    <div class="container mt-4">
+        <h1 class="mb-4">Registrar Viajes</h1>
+        <p class="text-muted">Email actual: {{ email }}</p>
 
-                trips.forEach(trip => {
-                    // gspread lee como float si los datos tienen decimales
-                    const monto = parseFloat(trip.Monto);
-                    const propina = parseFloat(trip.Propina);
-                    const rowTotal = parseFloat(trip.Total);
+        <div class="card p-4 mb-4">
+            <h3>Nuevo Viaje</h3>
+            <form id="trip-form">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" id="fecha" name="fecha" class="form-control" value="{{ "now"|date("Y-m-d") }}" required>
+                    </div>
                     
-                    totalMonto += monto;
-                    totalPropina += propina;
-                    totalDiaViajes += rowTotal;
-                    
-                    html += `
-                        <tr>
-                            <td>${trip.Numero}</td>
-                            <td>${trip['Hora inicio']}</td>
-                            <td>${trip['Hora fin']}</td>
-                            <td>${formatCurrency(monto)}</td>
-                            <td>${formatCurrency(propina)}</td>
-                            <td>${trip.Aeropuerto > 0 ? 'Sí' : 'No'}</td>
-                            <td><strong>${formatCurrency(rowTotal)}</strong></td>
-                        </tr>
-                    `;
-                });
+                    <div class="col-md-4 mb-3">
+                        <label for="hora_inicio" class="form-label">Hora Inicio</label>
+                        <input type="time" id="hora_inicio" name="hora_inicio" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="hora_fin" class="form-label">Hora Fin</label>
+                        <input type="time" id="hora_fin" name="hora_fin" class="form-control" required>
+                    </div>
+                </div>
                 
-                html += `</tbody></table></div>`;
-
-                // --- Mostrar Resumen y Bonos ---
-                const totalFinalDia = totalDiaViajes + bonus;
-
-                html += `
-                    <hr>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <h4>Resumen de Ingresos por Viajes</h4>
-                            <p>Monto base (viajes): <strong>${formatCurrency(totalMonto)}</strong></p>
-                            <p>Propina total: <strong>${formatCurrency(totalPropina)}</strong></p>
-                            <p>Subtotal (Monto + Propina): <strong>${formatCurrency(totalDiaViajes)}</strong></p>
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <h4>💰 Bonificación de Uber</h4>
-                            <p class="text-success">Bono por ${trips.length} servicios: <strong>${formatCurrency(bonus)}</strong></p>
-                            <hr class="d-md-none">
-                            <p class="h4">Total de Ingresos del Día</p>
-                            <p class="h2 text-primary"><strong>${formatCurrency(totalFinalDia)}</strong></p>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="monto" class="form-label">Monto (S/)</label>
+                        <input type="number" step="0.01" id="monto" name="monto" class="form-control" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="propina" class="form-label">Propina (S/)</label>
+                        <input type="number" step="0.01" id="propina" name="propina" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3 d-flex align-items-end">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="aeropuerto" name="aeropuerto">
+                            <label class="form-check-label" for="aeropuerto">Cargo Aeropuerto</label>
                         </div>
                     </div>
-                `;
-
-            } else {
-                html = '<div class="alert alert-info">Aún no hay viajes registrados para este día.</div>';
-            }
-            
-            tripsListDiv.innerHTML = html;
-
-        } catch (error) {
-            console.error('Error al cargar los viajes:', error);
-            tripsListDiv.innerHTML = '<div class="alert alert-danger">Error al conectar con la API de viajes.</div>';
-        }
-    }
-
-    // 2. Manejar el envío del formulario (Lógica POST)
-    tripForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const data = {
-            fecha: tripForm.fecha.value,
-            hora_inicio: tripForm.hora_inicio.value,
-            hora_fin: tripForm.hora_fin.value,
-            monto: parseFloat(tripForm.monto.value),
-            propina: parseFloat(tripForm.propina.value || 0),
-            aeropuerto: tripForm.aeropuerto.checked
-        };
-        
-        try {
-            const response = await fetch('/api/trips', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-            
-            if (response.ok) {
-                // Mensaje de éxito y bono actualizado
-                alert(`Viaje #${result.trip.Numero} registrado. Bono total actualizado a ${formatCurrency(result.new_bonus)}.`);
+                </div>
                 
-                // Limpiar inputs del formulario
-                tripForm.hora_inicio.value = '';
-                tripForm.hora_fin.value = '';
-                tripForm.monto.value = '';
-                tripForm.propina.value = '0';
-                tripForm.aeropuerto.checked = false;
-                
-                // Recargar la lista para mostrar el nuevo viaje y el bono
-                fetchAndDisplayTrips(data.fecha);
-            } else {
-                 alert(`Error al registrar el viaje: ${result.error || response.statusText}`);
-            }
-            
-        } catch (error) {
-            console.error('Error de red:', error);
-            alert('Error al conectar con el servidor.');
-        }
-    });
-    
-    // 3. Inicialización: Cargar viajes al iniciar y al cambiar la fecha
-    fetchAndDisplayTrips();
-    fechaInput.addEventListener('change', () => fetchAndDisplayTrips());
-});
+                <button type="submit" class="btn btn-success mt-3">Registrar Viaje</button>
+            </form>
+        </div>
+
+        <h2>Viajes del Día y Resumen</h2>
+        <div id="trips-list">
+            <p class="text-info">Cargando viajes y resumen del día...</p>
+        </div>
+    </div>
+{% endblock %}
