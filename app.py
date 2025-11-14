@@ -80,6 +80,8 @@ PRESUPUESTO_SHEET_ID = os.environ.get("PRESUPUESTO_SHEET_ID")
 TRIPS_SHEET_ID = os.environ.get("TRIPS_SHEET_ID")
 BONUS_SHEET_ID = os.environ.get("BONUS_SHEET_ID")
 GASTOS_SHEET_ID = os.environ.get("GASTOS_SHEET_ID")
+# CORRECCIÓN: Variable de entorno para Extras
+EXTRAS_SHEET_ID = os.environ.get("EXTRAS_SHEET_ID")
 KM_SHEET_ID = os.environ.get("KM_SHEET_ID")
 SUMMARIES_SHEET_ID = os.environ.get("SUMMARIES_SHEET_ID")
 
@@ -92,8 +94,8 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        # ACTUALIZADO: Chequeo de todos los IDs
-        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID", "TRIPS_SHEET_ID", "BONUS_SHEET_ID", "GASTOS_SHEET_ID", "KM_SHEET_ID", "SUMMARIES_SHEET_ID"]:
+        # ACTUALIZADO: Chequeo de todos los IDs, incluyendo EXTRAS_SHEET_ID
+        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID", "TRIPS_SHEET_ID", "BONUS_SHEET_ID", "GASTOS_SHEET_ID", "EXTRAS_SHEET_ID", "KM_SHEET_ID", "SUMMARIES_SHEET_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
 
@@ -156,6 +158,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
         "TripCounter_Trips": TRIPS_SHEET_ID,
         "TripCounter_Bonuses": BONUS_SHEET_ID,
         "TripCounter_Gastos": GASTOS_SHEET_ID,
+        "TripCounter_Extras": EXTRAS_SHEET_ID, # CORRECCIÓN: Añadido Extras
         "TripCounter_Kilometraje": KM_SHEET_ID,
         "TripCounter_Summaries": SUMMARIES_SHEET_ID,
     }
