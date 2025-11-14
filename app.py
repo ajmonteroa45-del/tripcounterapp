@@ -3,7 +3,7 @@ import time
 import json
 import logging
 import sys
-import traceback # Añadido para debugging
+import traceback 
 from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
@@ -55,8 +55,9 @@ BONUS_RULES = {
 }
 GASTOS_WS_NAME = "TripCounter_Gastos"
 GASTOS_HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
+# MODIFICADO: Añadida columna 'Tipo'
 PRESUPUESTO_WS_NAME = "TripCounter_Presupuesto"
-PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "fecha_pago", "pagado"] 
+PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "tipo", "fecha_pago", "pagado"] 
 EXTRAS_WS_NAME = "TripCounter_Extras"
 EXTRAS_HEADERS = ["Fecha","Numero","Hora inicio","Hora fin","Monto","Total"]
 KM_WS_NAME = "TripCounter_Kilometraje"
@@ -188,6 +189,8 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
     # 3. Asegurar que las Cabeceras son correctas
     try:
         current_headers = ws.row_values(1)
+        # IMPORTANTE: Si las cabeceras han cambiado en el código, la hoja de Sheets
+        # DEBE ser actualizada.
         if current_headers != headers:
             app.logger.warning(f"⚠️ Las cabeceras de '{WORKBOOK_NAME}' no coinciden. Sobrescribiendo.")
             ws.delete_rows(1)
@@ -401,6 +404,10 @@ def index():
             today = date.today()
             
             for i, r in enumerate(records):
+                # Solo procesamos si hay fecha de pago (es decir, si no es Gasto Variable)
+                if not r.get("fecha_pago"):
+                    continue 
+
                 try:
                     date_str = r.get("fecha_pago")
                     if not date_str or not date_str.strip():
@@ -662,10 +669,23 @@ def api_presupuesto():
         alias = session.get('email')
         categoria = body.get("categoria","").strip()
         monto = body.get("monto",0)
-        fecha_pago = body.get("fecha_pago")
-        if not categoria or not fecha_pago:
-            return jsonify({"error":"missing_fields"}), 400
         
+        # MODIFICADO: Recibir el tipo de gasto y la fecha de pago
+        tipo_gasto = body.get("tipo_gasto", "Variable").strip()
+        fecha_pago = body.get("fecha_pago", "").strip() # Si es Variable, será cadena vacía
+
+        if not categoria:
+            return jsonify({"error":"missing_fields", "message": "La categoría es obligatoria."}), 400
+        
+        # Validación de Gasto Fijo: debe tener fecha
+        if tipo_gasto == "Fijo" and not fecha_pago:
+            return jsonify({"error":"missing_date", "message": "Los gastos fijos requieren una fecha de pago."}), 400
+        
+        # Si es Gasto Variable, aseguramos que la fecha esté vacía para la hoja
+        if tipo_gasto == "Variable":
+            fecha_pago = ""
+
+        # Validación de Monto
         try:
             monto = float(monto)
             if monto <= 0:
@@ -674,7 +694,9 @@ def api_presupuesto():
             return jsonify({"error": "monto_invalido", "message": "El monto debe ser numérico."}), 400
 
         try:
-            row = [alias, categoria, monto, fecha_pago, "False"]
+            # MODIFICADO: Añadir 'tipo_gasto' a la fila
+            # Columnas: ["alias", "categoria", "monto", "tipo", "fecha_pago", "pagado"]
+            row = [alias, categoria, monto, tipo_gasto, fecha_pago, "False"]
             ws.append_row(row)
         except Exception as e:
             app.logger.error(f"Error al registrar presupuesto: {e}")
@@ -689,6 +711,7 @@ def api_presupuesto():
         if not row_index:
             return jsonify({"error":"missing_row_index"}), 400
         try:
+            # La columna 'pagado' sigue siendo la última, por lo que el índice no debería cambiar si la estructura se mantiene ordenada.
             ws.update_cell(int(row_index), PRESUPUESTO_HEADERS.index("pagado") + 1, "True")
             return jsonify({"status":"ok"}), 200
         except Exception as e:
