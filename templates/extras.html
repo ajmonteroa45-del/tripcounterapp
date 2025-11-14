@@ -1,26 +1,50 @@
 {% extends "base.html" %}
-{% block content %}
-  <h2>Registrar viajes extra</h2>
-  <section class="card">
-    <form id="extra-form">
-      <label>Fecha:
-        <input type="date" name="fecha" id="fecha_extra" value="{{ (datetime.utcnow().date()).isoformat() }}">
-      </label>
-      <label>Hora inicio:
-        <input type="time" name="hora_inicio" id="hora_inicio_extra" required>
-      </label>
-      <label>Hora fin:
-        <input type="time" name="hora_fin" id="hora_fin_extra" required>
-      </label>
-      <label>Monto S/:
-        <input type="number" name="monto" id="monto_extra" step="0.01" required>
-      </label>
-      <button type="submit" class="btn">Registrar viaje extra</button>
-    </form>
-  </section>
 
-  <section class="card">
-    <h3>Viajes extra del día</h3>
-    <div id="extras-list">Cargando...</div>
-  </section>
+{% block title %}Registrar Extras{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        
+        <a href="{{ url_for('viajes_page') }}" class="btn btn-info mb-4">
+            Volver a Registrar Viajes 🚗
+        </a>
+        <hr>
+        <h1 class="mb-4">Registrar Viajes Extra</h1>
+        
+        <section class="card p-4 mb-4">
+            <h3>Nuevo Viaje Extra</h3>
+            <form id="extra-form">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="fecha_extra" class="form-label">Fecha</label>
+                        <input type="date" name="fecha" id="fecha_extra" class="form-control" value="{{ today_date }}" required>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="hora_inicio_extra" class="form-label">Hora inicio</label>
+                        <input type="time" name="hora_inicio" id="hora_inicio_extra" class="form-control" required>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="hora_fin_extra" class="form-label">Hora fin</label>
+                        <input type="time" name="hora_fin" id="hora_fin_extra" class="form-control" required>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="monto_extra" class="form-label">Monto (S/)</label>
+                        <input type="number" name="monto" id="monto_extra" class="form-control" step="0.01" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary mt-3">Registrar Viaje Extra</button>
+            </form>
+        </section>
+
+        <section class="card p-4">
+            <h3>Viajes Extra del Día</h3>
+            <div id="extras-list">
+                <p class="text-info">Cargando viajes extra...</p>
+            </div>
+        </section>
+    </div>
 {% endblock %}
