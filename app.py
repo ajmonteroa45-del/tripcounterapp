@@ -77,7 +77,11 @@ SUMMARIES_HEADERS = [
 ]
 # --- ID DE HOJA CRÍTICA (PRESENTE EN ENTORNO DE RENDER) ---
 PRESUPUESTO_SHEET_ID = os.environ.get("PRESUPUESTO_SHEET_ID")
-TRIPS_SHEET_ID = os.environ.get("TRIPS_SHEET_ID") # AÑADIDO: Nuevo ID para Trips
+TRIPS_SHEET_ID = os.environ.get("TRIPS_SHEET_ID")
+BONUS_SHEET_ID = os.environ.get("BONUS_SHEET_ID")
+GASTOS_SHEET_ID = os.environ.get("GASTOS_SHEET_ID")
+KM_SHEET_ID = os.environ.get("KM_SHEET_ID")
+SUMMARIES_SHEET_ID = os.environ.get("SUMMARIES_SHEET_ID")
 
 
 # ----------------------------
@@ -88,8 +92,8 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        # AGREGADO: TRIPS_SHEET_ID a la lista de chequeo
-        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID", "TRIPS_SHEET_ID"]:
+        # ACTUALIZADO: Chequeo de todos los IDs
+        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID", "TRIPS_SHEET_ID", "BONUS_SHEET_ID", "GASTOS_SHEET_ID", "KM_SHEET_ID", "SUMMARIES_SHEET_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
 
@@ -137,24 +141,31 @@ def get_gspread_client():
         app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la reconstrucción o autorización. Detalle: {e}")
         raise Exception(f"Error de credenciales GSheets: {e}")
 
-# --- FUNCIÓN CORREGIDA PARA USAR ID DEL ARCHIVO DE PRESUPUESTO Y TRIPS ---
+# --- FUNCIÓN CORREGIDA FINAL (SOPORTE PARA TODOS LOS IDs) ---
 def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
     """
-    Abre el Workbook (archivo) usando el ID si es una hoja crítica (Presupuesto/Trips) 
-    o el nombre para el resto. Implementa reintentos.
+    Abre el Workbook (archivo) usando el ID si es una hoja crítica,
+    o el nombre para archivos no críticos.
     """
     WORKBOOK_NAME = ws_name
     SHEET_ID = None
     
-    if WORKBOOK_NAME == "TripCounter_Presupuesto":
-        SHEET_ID = PRESUPUESTO_SHEET_ID
-    elif WORKBOOK_NAME == "TripCounter_Trips": # AÑADIDO: Lógica para Viajes
-        SHEET_ID = TRIPS_SHEET_ID
+    # Mapeo de nombres de hojas a variables de ID
+    ID_MAP = {
+        "TripCounter_Presupuesto": PRESUPUESTO_SHEET_ID,
+        "TripCounter_Trips": TRIPS_SHEET_ID,
+        "TripCounter_Bonuses": BONUS_SHEET_ID,
+        "TripCounter_Gastos": GASTOS_SHEET_ID,
+        "TripCounter_Kilometraje": KM_SHEET_ID,
+        "TripCounter_Summaries": SUMMARIES_SHEET_ID,
+    }
     
+    SHEET_ID = ID_MAP.get(WORKBOOK_NAME)
+
     # Seleccionamos el método de apertura
     if SHEET_ID:
         if not SHEET_ID:
-            app.logger.error(f"❌ ERROR CRÍTICO: {WORKBOOK_NAME}_SHEET_ID no configurado.")
+            app.logger.error(f"❌ ERROR CRÍTICO: {WORKBOOK_NAME} ID no configurado.")
             raise Exception(f"Falta el ID del archivo {WORKBOOK_NAME} en la configuración de Render.")
         open_func = lambda: client.open_by_key(SHEET_ID)
     else:
@@ -173,7 +184,6 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
                 time.sleep(wait_time)
             else:
                 app.logger.error(f"❌ ERROR CRÍTICO: Fallaron todos los {max_retries} intentos para abrir el archivo '{WORKBOOK_NAME}'. Error: {e}")
-                # El error se lanza como NotFound, pero el mensaje indica que falló después de reintentos.
                 raise gspread.exceptions.SpreadsheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado después de reintentos (ID:{SHEET_ID}).") from e
         except Exception as e:
             if attempt < max_retries - 1:
@@ -209,7 +219,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
             pass 
 
     return ws
-# --- FIN DE LA FUNCIÓN MODIFICADA ---
+# --- FIN DE LA FUNCIÓN CORREGIDA FINAL ---
 
 
 # ----------------------------
