@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import sys
+# Importamos traceback para usarlo en la función de depuración de errores
+import traceback
 from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
@@ -81,7 +83,6 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        # Eliminamos SERVICE_ACCOUNT_B64 y revisamos una clave GSPREAD clave
         for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
@@ -101,7 +102,6 @@ def get_gspread_client():
 
     try:
         # 2. Reconstruir el diccionario de credenciales
-        # Nota: Usamos .get() para las claves menos críticas, aunque idealmente todas deberían estar.
         private_key = os.getenv("GSPREAD_PRIVATE_KEY")
         # Esto maneja el caso de que los saltos de línea se hayan copiado como caracteres literales '\n'
         cleaned_private_key = private_key.replace("\\n", "\n") 
@@ -332,8 +332,12 @@ def oauth2callback():
         return redirect(url_for("index"))
 
     except Exception as e:
-        app.logger.error(f"OAuth callback error: {e}")
-        return f"<h3>Authentication failed: {e}</h3>", 500
+        # --- MODIFICACIÓN DE DEBUGGING AQUÍ ---
+        app.logger.error(f"❌ ERROR CRÍTICO en OAuth callback: {e}")
+        app.logger.error("Se produjo una excepción después del login de Google. Imprimiendo Stack Trace completo:")
+        app.logger.error(traceback.format_exc()) # Imprime el stack trace completo al log
+        # --------------------------------------
+        return f"<h3>Authentication failed. Check logs for GSheets credential error. Detail: {e}</h3>", 500
 
 
 @app.route("/logout")
