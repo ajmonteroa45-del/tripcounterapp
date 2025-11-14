@@ -644,10 +644,14 @@ def api_extras():
     
     return jsonify({"status":"ok","extra":dict(zip(EXTRAS_HEADERS,row))}), 201
 
+# app.py
+
+# ... (código anterior) ...
+
 # ----------------------------
 # API: Presupuesto
 # ----------------------------
-@app.route("/api/presupuesto", methods=["GET","POST","PUT"])
+@app.route("/api/presupuesto", methods=["GET","POST","PUT","DELETE"])
 def api_presupuesto():
     if not session.get('email'):
         return jsonify({"error":"not_authenticated"}), 401
@@ -670,22 +674,18 @@ def api_presupuesto():
         categoria = body.get("categoria","").strip()
         monto = body.get("monto",0)
         
-        # MODIFICADO: Recibir el tipo de gasto y la fecha de pago
         tipo_gasto = body.get("tipo_gasto", "Variable").strip()
-        fecha_pago = body.get("fecha_pago", "").strip() # Si es Variable, será cadena vacía
+        fecha_pago = body.get("fecha_pago", "").strip()
 
         if not categoria:
             return jsonify({"error":"missing_fields", "message": "La categoría es obligatoria."}), 400
         
-        # Validación de Gasto Fijo: debe tener fecha
         if tipo_gasto == "Fijo" and not fecha_pago:
             return jsonify({"error":"missing_date", "message": "Los gastos fijos requieren una fecha de pago."}), 400
         
-        # Si es Gasto Variable, aseguramos que la fecha esté vacía para la hoja
         if tipo_gasto == "Variable":
             fecha_pago = ""
 
-        # Validación de Monto
         try:
             monto = float(monto)
             if monto <= 0:
@@ -694,8 +694,6 @@ def api_presupuesto():
             return jsonify({"error": "monto_invalido", "message": "El monto debe ser numérico."}), 400
 
         try:
-            # MODIFICADO: Añadir 'tipo_gasto' a la fila
-            # Columnas: ["alias", "categoria", "monto", "tipo", "fecha_pago", "pagado"]
             row = [alias, categoria, monto, tipo_gasto, fecha_pago, "False"]
             ws.append_row(row)
         except Exception as e:
@@ -704,19 +702,42 @@ def api_presupuesto():
             
         return jsonify({"status":"ok","entry":dict(zip(PRESUPUESTO_HEADERS,row))}), 201
 
-    # PUT -> mark as paid; expects 'row_index' (1-based)
     if request.method == "PUT":
         body = request.get_json() or {}
         row_index = body.get("row_index")
         if not row_index:
             return jsonify({"error":"missing_row_index"}), 400
         try:
-            # La columna 'pagado' sigue siendo la última, por lo que el índice no debería cambiar si la estructura se mantiene ordenada.
+            # Marcar como pagado
             ws.update_cell(int(row_index), PRESUPUESTO_HEADERS.index("pagado") + 1, "True")
             return jsonify({"status":"ok"}), 200
         except Exception as e:
             app.logger.error(f"Error actualizando celda en GSheets: {e}")
             return jsonify({"error":f"Error al actualizar la hoja: {e}"}), 500
+            
+    # --- NUEVA LÓGICA DELETE ---
+    if request.method == "DELETE":
+        # Nota: Los datos DELETE se envían en el body o query params, usaremos body para el row_index
+        body = request.get_json() or {}
+        row_index = body.get("row_index")
+        if not row_index:
+            return jsonify({"error":"missing_row_index"}), 400
+            
+        try:
+            row_index = int(row_index)
+            if row_index < 2: # No se puede borrar la fila de cabecera (Fila 1)
+                 return jsonify({"error":"invalid_row", "message": "No se puede eliminar la fila de cabecera."}), 400
+                 
+            # Eliminación de la fila en Google Sheets
+            ws.delete_rows(row_index)
+            return jsonify({"status":"ok", "message": f"Fila {row_index} eliminada."}), 200
+            
+        except Exception as e:
+            app.logger.error(f"Error eliminando fila en GSheets: {e}")
+            return jsonify({"error":f"Error al eliminar la fila: {e}"}), 500
+
+# ... (resto del código se mantiene igual) ...
+
 
 # ----------------------------
 # API: Kilometraje
