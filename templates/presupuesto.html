@@ -1,173 +1,71 @@
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const tableBody = document.querySelector('#presupuesto-table tbody');
-        const form = document.getElementById('add-presupuesto-form');
-        
-        // Elementos de la nueva lógica (Fijo/Variable)
-        const fijoRadio = document.getElementById('gasto_fijo');
-        const variableRadio = document.getElementById('gasto_variable');
-        const fechaContainer = document.getElementById('fecha-pago-container');
-        const fechaInput = document.getElementById('fecha_pago');
+{% extends "base.html" %}
 
-        // LÓGICA DE VISIBILIDAD DE FECHA
-        function toggleFechaInput() {
-            if (fijoRadio.checked) {
-                fechaContainer.style.display = 'block';
-                fechaInput.setAttribute('required', 'required');
-            } else {
-                fechaContainer.style.display = 'none';
-                fechaInput.removeAttribute('required');
-            }
-        }
-        
-        fijoRadio.addEventListener('change', toggleFechaInput);
-        variableRadio.addEventListener('change', toggleFechaInput);
-        toggleFechaInput(); // Inicializar el estado
+{% block title %}Trip Counter - Presupuesto{% endblock %}
 
-        // Función para cargar y renderizar los datos
-        function loadPresupuestos() {
-            // Colspan ajustado a 6
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
-            fetch('/api/presupuesto')
-                .then(response => response.json())
-                .then(data => {
-                    tableBody.innerHTML = '';
-                    if (data.length === 0) {
-                        // Colspan ajustado a 6
-                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay ítems de presupuesto registrados.</td></tr>';
-                        return;
-                    }
-                    data.forEach((item, index) => {
-                        // El índice de la fila es index + 2
-                        const rowIndex = index + 2; 
-                        
-                        const row = tableBody.insertRow();
-                        // Estructura de 6 columnas: Categoría, Monto, Tipo, Fecha de Pago, Pagado, Acción
-                        row.innerHTML = `
-                            <td>${item.categoria}</td>
-                            <td>S/${parseFloat(item.monto).toFixed(2)}</td>
-                            <td>${item.tipo}</td>
-                            <td>${item.fecha_pago || 'N/A'}</td>
-                            <td data-pagado="${item.pagado}">${item.pagado === "True" ? '<span class="text-success">Sí</span>' : 'No'}</td>
-                            <td>
-                                ${item.pagado === "False" ? 
-                                    `<button class="btn btn-sm btn-info mark-paid-btn me-2" data-row-index="${rowIndex}">
-                                        Marcar
-                                    </button>` : 
-                                    '<span class="text-success me-2">Pagado</span>'
-                                }
-                                <button class="btn btn-sm btn-danger delete-btn" data-row-index="${rowIndex}">
-                                    Eliminar
-                                </button>
-                            </td>
-                        `;
-                    });
-                })
-                .catch(error => {
-                    console.error('Error cargando presupuesto:', error);
-                    // Colspan ajustado a 6
-                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar datos.</td></tr>';
-                });
-        }
-        
-        // MANEJAR EL ENVÍO DEL FORMULARIO (POST)
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
+{% block content %}
+<div class="container mt-4">
+    <h1>Administrar Presupuesto</h1>
+    
+    <div class="mb-3">
+        <a href="{{ url_for('viajes_page') }}" class="btn btn-primary">
+            <i class="fas fa-car-side"></i> Registrar Viajes
+        </a>
+    </div>
+
+    <div class="card p-3 mb-4">
+        <h3>Agregar Nuevo Ítem</h3>
+        <div id="budget-message"></div> 
+        <form id="add-presupuesto-form">
+            <div class="form-group mb-3">
+                <label for="categoria">Categoría:</label>
+                <input type="text" class="form-control" id="categoria" required>
+            </div>
+            <div class="form-group mb-3">
+                <label for="monto">Monto (USD):</label>
+                <input type="number" step="0.01" class="form-control" id="monto" required>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label">Tipo de Gasto:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="tipo_gasto" id="gasto_fijo" value="Fijo" checked>
+                    <label class="form-check-label" for="gasto_fijo">
+                        Fijo (Requiere fecha de pago)
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="tipo_gasto" id="gasto_variable" value="Variable">
+                    <label class="form-check-label" for="gasto_variable">
+                        Variable (No requiere fecha)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group mb-3" id="fecha-pago-container">
+                <label for="fecha_pago">Fecha de pago:</label>
+                <input type="date" class="form-control" id="fecha_pago" required>
+            </div>
             
-            const tipoGasto = document.querySelector('input[name="tipo_gasto"]:checked').value;
-            let fechaPago = '';
+            <button type="submit" class="btn btn-success">Agregar categoría</button>
+        </form>
+    </div>
 
-            // Lógica de validación de Gasto Fijo
-            if (tipoGasto === 'Fijo') {
-                fechaPago = fechaInput.value;
-                if (!fechaPago) {
-                    alert('El gasto fijo requiere una fecha de pago.');
-                    return;
-                }
-            }
-
-            const data = {
-                categoria: document.getElementById('categoria').value,
-                monto: document.getElementById('monto').value,
-                tipo_gasto: tipoGasto, 
-                fecha_pago: fechaPago
-            };
-
-            fetch('/api/presupuesto', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    form.reset();
-                    toggleFechaInput(); // Resetear el estado de la fecha
-                    alert('Presupuesto añadido con éxito!');
-                    loadPresupuestos(); // Recargar la lista
-                } else {
-                    alert('Error al agregar presupuesto: ' + data.message || data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Ocurrió un error de red al añadir el presupuesto.');
-            });
-        });
-
-        // MANEJAR LOS BOTONES DE ACCIÓN (PUT y DELETE)
-        tableBody.addEventListener('click', function(e) {
-            const target = e.target;
-            const rowIndex = target.getAttribute('data-row-index');
-            if (!rowIndex) return;
-
-            if (target.classList.contains('mark-paid-btn')) {
-                // Lógica Marcar como Pagado (PUT)
-                fetch('/api/presupuesto', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ row_index: rowIndex })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'ok') {
-                        alert('Ítem marcado como pagado.');
-                        loadPresupuestos();
-                    } else {
-                        alert('Error al marcar como pagado.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Ocurrió un error de red al actualizar el presupuesto.');
-                });
-            } else if (target.classList.contains('delete-btn')) {
-                // Lógica Eliminar (DELETE)
-                if (confirm('¿Estás seguro de que quieres eliminar esta categoría de presupuesto?')) {
-                    fetch('/api/presupuesto', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ row_index: rowIndex })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'ok') {
-                            alert('Categoría eliminada con éxito.');
-                            loadPresupuestos(); 
-                        } else {
-                            alert('Error al eliminar la categoría: ' + (data.message || data.error));
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Ocurrió un error de red al eliminar el presupuesto.');
-                    });
-                }
-            }
-        });
-
-        loadPresupuestos(); 
-    });
-</script>
+    <div class="card p-3">
+        <h3>Presupuestos Pendientes</h3>
+        <table class="table table-striped" id="presupuesto-table">
+            <thead>
+                <tr>
+                    <th>Categoría</th>
+                    <th>Monto</th>
+                    <th>Tipo</th>
+                    <th>Fecha de Pago</th>
+                    <th>Pagado</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
