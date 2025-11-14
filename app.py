@@ -1,9 +1,8 @@
 import os
+import time 
 import json
 import logging
 import sys
-# Importamos traceback para usarlo en la función de depuración de errores
-import traceback
 from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
@@ -12,6 +11,8 @@ import gspread
 import base64
 from google.oauth2.service_account import Credentials
 import gspread.exceptions
+# Necesario para el debugging
+import traceback
 
 # ----------------------------
 # CONFIG / LOGGING
@@ -95,15 +96,12 @@ def get_gspread_client():
     Establece la conexión con Google Sheets reconstruyendo el JSON
     a partir de variables de entorno individuales (GSPREAD_*).
     """
-    # 1. Verificar la existencia de las variables clave
     if not os.getenv("GSPREAD_PRIVATE_KEY") or not os.getenv("GSPREAD_CLIENT_EMAIL"):
         app.logger.error("❌ ERROR CRÍTICO DE CREDENCIALES: Faltan variables GSPREAD_PRIVATE_KEY o GSPREAD_CLIENT_EMAIL.")
         raise Exception("Error de configuración: Faltan variables de credenciales GSPREAD.")
 
     try:
-        # 2. Reconstruir el diccionario de credenciales
         private_key = os.getenv("GSPREAD_PRIVATE_KEY")
-        # Esto maneja el caso de que los saltos de línea se hayan copiado como caracteres literales '\n'
         cleaned_private_key = private_key.replace("\\n", "\n") 
         
         creds_dict = {
@@ -134,22 +132,51 @@ def get_gspread_client():
         app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la reconstrucción o autorización. Detalle: {e}")
         raise Exception(f"Error de credenciales GSheets: {e}")
 
+# --- FUNCIÓN MODIFICADA CON REINTENTOS ---
+def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
+    """
+    Abre el Workbook (archivo) con el nombre 'ws_name' y asegura las cabeceras,
+    implementando reintentos por si hay fallas de conexión transitorias.
+    """
+    WORKBOOK_NAME = ws_name
+    
+    # 1. Abrir el Workbook con reintentos
+    workbook = None
+    for attempt in range(max_retries):
+        try:
+            workbook = client.open(WORKBOOK_NAME) 
+            break # Éxito, salir del bucle
+        except gspread.exceptions.SpreadsheetNotFound as e:
+            # Si el error es una falla transitoria de conexión
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Espera: 1s, 2s, 4s...
+                app.logger.warning(f"⚠️ Intento {attempt + 1} fallido para abrir '{WORKBOOK_NAME}'. Reintentando en {wait_time}s. Error: {e}")
+                time.sleep(wait_time)
+            else:
+                # Si falla el último intento, el error es definitivo
+                app.logger.error(f"❌ ERROR CRÍTICO: Fallaron todos los {max_retries} intentos para abrir el archivo '{WORKBOOK_NAME}'. Error: {e}")
+                raise gspread.exceptions.SpreadsheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos después de reintentos.") from e
+        except Exception as e:
+            # Capturar otros errores inesperados durante la conexión
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                app.logger.warning(f"⚠️ Intento {attempt + 1} fallido por error inesperado. Reintentando en {wait_time}s. Error: {e}")
+                time.sleep(wait_time)
+            else:
+                app.logger.error(f"❌ ERROR CRÍTICO: Falla final por error inesperado: {e}")
+                raise
 
-def ensure_sheet_with_headers(client, ws_name, headers):
-    """
-    Abre el Workbook (archivo) con el nombre 'ws_name' y asegura las cabeceras.
-    """
-    WORKBOOK_NAME = ws_name 
+    # 2. Obtener la Pestaña (Worksheet) - Esto solo se ejecuta si el bucle fue exitoso
+    # Ya que 'workbook' es None si no se rompió el bucle:
+    if workbook is None:
+         # Esto solo debería ocurrir si el bucle falló y el raise no fue alcanzado
+        raise Exception(f"Error fatal: la conexión con Google Sheets no se pudo establecer para {WORKBOOK_NAME}.")
+
     try:
-        # 1. Abrir el Workbook (Archivo principal de Google Sheets)
-        workbook = client.open(WORKBOOK_NAME) 
-    except gspread.WorksheetNotFound:
-        # Este error ocurre si el archivo con ese nombre no existe o la cuenta de servicio no tiene acceso
-        app.logger.error(f"❌ ERROR: El archivo principal '{WORKBOOK_NAME}' no fue encontrado. Verifica el acceso de la Cuenta de Servicio.")
-        raise gspread.WorksheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos.")
-        
-    # 2. Obtener la Pestaña (Worksheet)
-    ws = workbook.get_worksheet(0)
+        ws = workbook.get_worksheet(0)
+    except Exception as e:
+        app.logger.error(f"Error al obtener la pestaña de {WORKBOOK_NAME}: {e}")
+        raise
         
     # 3. Asegurar que las Cabeceras son correctas
     try:
@@ -166,6 +193,7 @@ def ensure_sheet_with_headers(client, ws_name, headers):
             pass 
 
     return ws
+# --- FIN DE LA FUNCIÓN MODIFICADA ---
 
 
 # ----------------------------
@@ -332,11 +360,9 @@ def oauth2callback():
         return redirect(url_for("index"))
 
     except Exception as e:
-        # --- MODIFICACIÓN DE DEBUGGING AQUÍ ---
         app.logger.error(f"❌ ERROR CRÍTICO en OAuth callback: {e}")
         app.logger.error("Se produjo una excepción después del login de Google. Imprimiendo Stack Trace completo:")
-        app.logger.error(traceback.format_exc()) # Imprime el stack trace completo al log
-        # --------------------------------------
+        app.logger.error(traceback.format_exc())
         return f"<h3>Authentication failed. Check logs for GSheets credential error. Detail: {e}</h3>", 500
 
 
