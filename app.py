@@ -1,8 +1,9 @@
 import os
-import time 
+import time
 import json
 import logging
 import sys
+import traceback # Añadido para debugging
 from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
@@ -11,8 +12,6 @@ import gspread
 import base64
 from google.oauth2.service_account import Credentials
 import gspread.exceptions
-# Necesario para el debugging
-import traceback
 
 # ----------------------------
 # CONFIG / LOGGING
@@ -75,6 +74,9 @@ SUMMARIES_HEADERS = [
     "Ganancia Neta",
     "Productividad S/KM"
 ]
+# --- ID DE HOJA CRÍTICA (PRESENTE EN ENTORNO DE RENDER) ---
+PRESUPUESTO_SHEET_ID = os.environ.get("PRESUPUESTO_SHEET_ID")
+
 
 # ----------------------------
 # Debug inicial visible en Render logs
@@ -84,7 +86,7 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID"]:
+        for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
 
@@ -132,32 +134,39 @@ def get_gspread_client():
         app.logger.error(f"❌ ERROR CRÍTICO DE CREDENCIALES: Falló la reconstrucción o autorización. Detalle: {e}")
         raise Exception(f"Error de credenciales GSheets: {e}")
 
-# --- FUNCIÓN MODIFICADA CON REINTENTOS ---
+# --- FUNCIÓN MODIFICADA PARA USAR ID DEL ARCHIVO DE PRESUPUESTO ---
 def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
     """
-    Abre el Workbook (archivo) con el nombre 'ws_name' y asegura las cabeceras,
-    implementando reintentos por si hay fallas de conexión transitorias.
+    Abre el Workbook (archivo) usando el ID si es 'TripCounter_Presupuesto' 
+    o el nombre para el resto. Implementa reintentos.
     """
     WORKBOOK_NAME = ws_name
     
+    # Seleccionamos el método de apertura (por ID si es la hoja crítica, por nombre para el resto)
+    if WORKBOOK_NAME == "TripCounter_Presupuesto":
+        if not PRESUPUESTO_SHEET_ID:
+            app.logger.error("❌ ERROR CRÍTICO: PRESUPUESTO_SHEET_ID no configurado en variables de entorno.")
+            raise Exception("Falta el ID del archivo de Presupuesto en la configuración de Render.")
+        open_func = lambda: client.open_by_key(PRESUPUESTO_SHEET_ID)
+    else:
+        open_func = lambda: client.open(WORKBOOK_NAME)
+
     # 1. Abrir el Workbook con reintentos
     workbook = None
     for attempt in range(max_retries):
         try:
-            workbook = client.open(WORKBOOK_NAME) 
+            workbook = open_func()
             break # Éxito, salir del bucle
         except gspread.exceptions.SpreadsheetNotFound as e:
-            # Si el error es una falla transitoria de conexión
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # Espera: 1s, 2s, 4s...
+                wait_time = 2 ** attempt
                 app.logger.warning(f"⚠️ Intento {attempt + 1} fallido para abrir '{WORKBOOK_NAME}'. Reintentando en {wait_time}s. Error: {e}")
                 time.sleep(wait_time)
             else:
-                # Si falla el último intento, el error es definitivo
                 app.logger.error(f"❌ ERROR CRÍTICO: Fallaron todos los {max_retries} intentos para abrir el archivo '{WORKBOOK_NAME}'. Error: {e}")
-                raise gspread.exceptions.SpreadsheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado o sin permisos después de reintentos.") from e
+                # El error se lanza como NotFound, pero el mensaje indica que falló después de reintentos.
+                raise gspread.exceptions.SpreadsheetNotFound(f"Archivo '{WORKBOOK_NAME}' no encontrado después de reintentos (ID:{PRESUPUESTO_SHEET_ID}).") from e
         except Exception as e:
-            # Capturar otros errores inesperados durante la conexión
             if attempt < max_retries - 1:
                 wait_time = 2 ** attempt
                 app.logger.warning(f"⚠️ Intento {attempt + 1} fallido por error inesperado. Reintentando en {wait_time}s. Error: {e}")
@@ -166,10 +175,8 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
                 app.logger.error(f"❌ ERROR CRÍTICO: Falla final por error inesperado: {e}")
                 raise
 
-    # 2. Obtener la Pestaña (Worksheet) - Esto solo se ejecuta si el bucle fue exitoso
-    # Ya que 'workbook' es None si no se rompió el bucle:
+    # 2. Obtener la Pestaña (Worksheet)
     if workbook is None:
-         # Esto solo debería ocurrir si el bucle falló y el raise no fue alcanzado
         raise Exception(f"Error fatal: la conexión con Google Sheets no se pudo establecer para {WORKBOOK_NAME}.")
 
     try:
@@ -197,7 +204,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
 
 
 # ----------------------------
-# FUNCIONES DE LÓGICA DE NEGOCIO (Bonos)
+# FUNCIONES DE LÓGICA DE NEGOCIO (El resto del código se mantiene igual)
 # ----------------------------
 def get_bonus_type(day_of_week):
     """Retorna la clave del tipo de bono basado en el día (0=Lunes, 6=Domingo)"""
