@@ -480,7 +480,13 @@ def viajes_page():
 def extras_page():
     if not session.get('email'):
         return redirect(url_for("login"))
-    return render_template("extras.html", email=session.get('email'))
+        
+    # CORRECCIÓN AÑADIDA: Calcular y pasar la fecha para evitar Jinja UndefinedError
+    today_date = date.today().isoformat()
+    
+    return render_template("extras.html", 
+                           email=session.get('email'),
+                           today_date=today_date) # PASAR la fecha
 
 @app.route("/presupuesto")
 def presupuesto_page():
