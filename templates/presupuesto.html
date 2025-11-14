@@ -3,12 +3,11 @@
         const tableBody = document.querySelector('#presupuesto-table tbody');
         const form = document.getElementById('add-presupuesto-form');
         
-        // Elementos de la nueva lógica
+        // Elementos de la nueva lógica (Fijo/Variable)
         const fijoRadio = document.getElementById('gasto_fijo');
         const variableRadio = document.getElementById('gasto_variable');
         const fechaContainer = document.getElementById('fecha-pago-container');
         const fechaInput = document.getElementById('fecha_pago');
-
 
         // LÓGICA DE VISIBILIDAD DE FECHA
         function toggleFechaInput() {
@@ -27,21 +26,23 @@
 
         // Función para cargar y renderizar los datos
         function loadPresupuestos() {
+            // Colspan ajustado a 6
             tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
             fetch('/api/presupuesto')
                 .then(response => response.json())
                 .then(data => {
                     tableBody.innerHTML = '';
                     if (data.length === 0) {
+                        // Colspan ajustado a 6
                         tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay ítems de presupuesto registrados.</td></tr>';
                         return;
                     }
                     data.forEach((item, index) => {
-                        // El índice de la fila es index + 2 porque las hojas de cálculo son 1-based y la fila 1 es la cabecera
+                        // El índice de la fila es index + 2
                         const rowIndex = index + 2; 
                         
-                        // Añadir una columna extra para el Tipo (Fijo/Variable)
                         const row = tableBody.insertRow();
+                        // Estructura de 6 columnas: Categoría, Monto, Tipo, Fecha de Pago, Pagado, Acción
                         row.innerHTML = `
                             <td>${item.categoria}</td>
                             <td>S/${parseFloat(item.monto).toFixed(2)}</td>
@@ -64,16 +65,59 @@
                 })
                 .catch(error => {
                     console.error('Error cargando presupuesto:', error);
+                    // Colspan ajustado a 6
                     tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar datos.</td></tr>';
                 });
         }
         
-        // Manejar el envío del formulario (POST)
+        // MANEJAR EL ENVÍO DEL FORMULARIO (POST)
         form.addEventListener('submit', function(e) {
-            // ... (Lógica POST idéntica a la anterior, solo se mantiene el código relevante) ...
+            e.preventDefault();
+            
+            const tipoGasto = document.querySelector('input[name="tipo_gasto"]:checked').value;
+            let fechaPago = '';
+
+            // Lógica de validación de Gasto Fijo
+            if (tipoGasto === 'Fijo') {
+                fechaPago = fechaInput.value;
+                if (!fechaPago) {
+                    alert('El gasto fijo requiere una fecha de pago.');
+                    return;
+                }
+            }
+
+            const data = {
+                categoria: document.getElementById('categoria').value,
+                monto: document.getElementById('monto').value,
+                tipo_gasto: tipoGasto, 
+                fecha_pago: fechaPago
+            };
+
+            fetch('/api/presupuesto', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    form.reset();
+                    toggleFechaInput(); // Resetear el estado de la fecha
+                    alert('Presupuesto añadido con éxito!');
+                    loadPresupuestos(); // Recargar la lista
+                } else {
+                    alert('Error al agregar presupuesto: ' + data.message || data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ocurrió un error de red al añadir el presupuesto.');
+            });
         });
 
-        // Manejar los botones de acción (PUT y DELETE)
+        // MANEJAR LOS BOTONES DE ACCIÓN (PUT y DELETE)
         tableBody.addEventListener('click', function(e) {
             const target = e.target;
             const rowIndex = target.getAttribute('data-row-index');
