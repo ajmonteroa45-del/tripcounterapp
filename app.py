@@ -491,6 +491,21 @@ def extras_page():
                            email=session.get('email'),
                            today_date=today_date) # PASAR la fecha
 
+# RUTA AGREGADA: Para registrar Gastos
+@app.route("/gastos")
+def gastos_page():
+    if not session.get('email'):
+        return redirect(url_for("login"))
+    
+    today_date = date.today().isoformat()
+    # Pasamos el objeto datetime para poder formatear la hora en la plantilla HTML si es necesario
+    now = datetime.now() 
+    
+    return render_template("expenses.html", 
+                           email=session.get('email'),
+                           today_date=today_date,
+                           now=now)
+
 @app.route("/presupuesto")
 def presupuesto_page():
     if not session.get('email'):
