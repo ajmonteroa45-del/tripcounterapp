@@ -57,7 +57,85 @@ body{
 
 .btn.small{ padding:6px 10px; font-size:13px; }
 
-/* --- Navegación --- */
+/* ---------------------------------------------------------------------- */
+/* --- NUEVOS ESTILOS PARA LA BARRA DE NAVEGACIÓN GLOBAL (MAIN-NAV) --- */
+/* ---------------------------------------------------------------------- */
+
+.main-nav-buttons {
+    padding: 10px 16px; /* Padding ajustado para coincidir con el layout */
+    background-color: #f8f9fa; /* Fondo ligero para la barra */
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-button-container {
+    display: flex;
+    flex-wrap: wrap; 
+    gap: 10px; /* Espacio prudente entre los botones */
+    justify-content: center; /* Centrar los botones horizontalmente */
+    max-width: 920px; /* Limitar el ancho del contenedor de botones */
+    margin: 0 auto;
+}
+
+.nav-btn {
+    /* Estilos generales que simulan el botón que deseas */
+    display: block; /* Ocupa todo el ancho disponible en el flex item */
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    color: white; 
+    font-weight: 600;
+    text-align: center;
+    transition: background-color 0.2s, opacity 0.2s;
+    flex-grow: 1; /* Permite que los botones crezcan ligeramente para llenar la fila */
+    flex-basis: auto; /* Permite que el navegador decida el tamaño base */
+    min-width: 120px; /* Ancho mínimo para legibilidad */
+    /* Aseguramos que el texto no se corte */
+    white-space: nowrap; 
+}
+
+.nav-btn:hover {
+    opacity: 0.9;
+}
+
+/* Colores de Botón Específicos */
+.btn-home {
+    background-color: #007bff; /* Azul */
+}
+
+.btn-viajes {
+    background-color: #28a745; /* Verde */
+}
+
+.btn-extras {
+    background-color: #ffc107; /* Amarillo/Advertencia */
+    color: #343a40; /* Texto oscuro para fondo claro */
+}
+
+.btn-gastos {
+    background-color: #dc3545; /* Rojo/Peligro */
+}
+
+.btn-presupuesto {
+    background-color: #17a2b8; /* Cyan/Info */
+}
+
+.btn-resumenes {
+    background-color: #6c757d; /* Gris/Secundario */
+}
+
+/* Media Query para pantallas pequeñas (móviles) */
+@media (max-width: 600px) {
+    .nav-btn {
+        flex-basis: 45%; /* Dos botones por fila en móviles */
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* --- FIN DE ESTILOS DE NAVEGACIÓN --- */
+/* ---------------------------------------------------------------------- */
+
+
+/* --- Navegación Anterior (DEPRECADA, MANTENIDA POR SI ACASO) --- */
 .nav-links a{
   display:inline-block;
   margin-right:10px;
