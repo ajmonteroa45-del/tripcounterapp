@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>{% block title %}Trip Counter{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <title>Trip Counter | {% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
 </head>
 <body>
   <header class="topbar">
     <div class="brand">🚗 Trip Counter</div>
     <div class="user">
-      {% if email %}
-        <span class="email">{{ email }}</span>
+      {% if session.get('email') %}
+        <span class="email">{{ session.get('email') }}</span>
         <a href="{{ url_for('logout') }}" class="btn small">Cerrar sesión</a>
       {% else %}
         <a href="{{ url_for('login') }}" class="btn small">Iniciar sesión</a>
@@ -19,6 +19,16 @@
     </div>
   </header>
 
+  {% if session.get('email') %}
+  <nav class="main-nav">
+    <a href="{{ url_for('index') }}" class="nav-link">Inicio</a>
+    <a href="{{ url_for('viajes_page') }}" class="nav-link">Registrar Viajes</a>
+    <a href="{{ url_for('extras_page') }}" class="nav-link">Viajes Extra</a>
+    <a href="{{ url_for('gastos_page') }}" class="nav-link">Registrar Gastos</a>
+    <a href="{{ url_for('presupuesto_page') }}" class="nav-link">Presupuesto</a>
+    <a href="{{ url_for('api_monthly_report') }}" class="nav-link">Resúmenes</a>
+  </nav>
+  {% endif %}
   <main class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
