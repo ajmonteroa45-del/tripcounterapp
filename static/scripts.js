@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const fechaInput = document.getElementById('fecha'); // Usado por Viajes y Gastos
     const fechaExtraInput = document.getElementById('fecha_extra'); 
     const fechaKmInput = document.getElementById('fecha_km'); 
+    const fechaSummaryInput = document.getElementById('summary_fecha');
     
     // Listener para Viajes y Gastos
     if (fechaInput) {
@@ -52,6 +53,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fechaKmInput) { 
          fechaKmInput.addEventListener('change', () => {
             if (document.getElementById('km-state-container')) fetchAndDisplayKM(fechaKmInput.value);
+        });
+    }
+    
+    // Listener para Resumen Diario
+    if (fechaSummaryInput) {
+         fechaSummaryInput.addEventListener('change', (e) => {
+            if (document.getElementById('summary-results')) fetchAndDisplaySummary(e.target.value);
         });
     }
 });
@@ -429,11 +437,54 @@ function initializeKilometrajePage() {
     const kmFormEnd = document.getElementById('km-end-form');
     const kmStateContainer = document.getElementById('km-state-container');
     const fechaKmInput = document.getElementById('fecha_km');
+    const summaryBtn = document.getElementById('calculate-summary-btn'); // Botón de resumen en KM page
+    const summaryResultsDiv = document.getElementById('summary-results'); // Div de resultados en KM page
 
     if (!kmFormStart || !kmFormEnd || !kmStateContainer || !fechaKmInput) return;
 
+    // Función auxiliar para calcular el resumen de productividad (duplicada intencionalmente para la página KM)
+    async function calculateAndDisplayKmSummary(date) {
+        if (!summaryResultsDiv) return;
+        summaryResultsDiv.innerHTML = '<p>Calculando...</p>';
+        if (summaryBtn) summaryBtn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/summary?date=${date}`, {credentials: 'include'});
+            const summary = await response.json();
+
+            if (response.status !== 200) {
+                summaryResultsDiv.innerHTML = `<div class="message-box error">Error: ${summary.error || 'API Error'}</div>`;
+                return;
+            }
+
+            let html = `
+                <div class="summary-output">
+                    <h4>Resultados para ${date}:</h4>
+                    <table class="summary-table">
+                        <tr><td>KM Recorrido</td><td>${summary.total_km} KM</td></tr>
+                        <tr><td>Ganancia Neta</td><td><strong>${formatCurrency(summary.net_income)}</strong></td></tr>
+                        <tr><td>Productividad S/KM</td><td><strong>${formatCurrency(summary.productivity_per_km)}/KM</strong></td></tr>
+                    </table>
+                    ${summary.is_complete ? '' : '<div class="message-box warning mt-3">⚠️ Información incompleta: Asegúrate de registrar viajes y finalizar el KM.</div>'}
+                </div>
+            `;
+            summaryResultsDiv.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error al calcular el resumen en KM:', error);
+            summaryResultsDiv.innerHTML = '<div class="message-box error">Error de conexión.</div>';
+        } finally {
+            if (summaryBtn) summaryBtn.disabled = false;
+        }
+    }
+
     // Carga inicial
     fetchAndDisplayKM(fechaKmInput.value); 
+    // Si el botón de resumen existe, lo adjuntamos a la carga inicial de KM
+    if (summaryBtn) {
+        summaryBtn.addEventListener('click', () => calculateAndDisplayKmSummary(fechaKmInput.value));
+        calculateAndDisplayKmSummary(fechaKmInput.value); // Ejecuta el resumen al cargar la página
+    }
 
     // Función de renderizado (GET)
     async function fetchAndDisplayKM(date) {
@@ -484,6 +535,9 @@ function initializeKilometrajePage() {
             } else {
                  kmStateContainer.innerHTML = `<div class="alert alert-danger">Error al cargar datos: ${data.error || 'Error API'}</div>`;
             }
+            
+            // Actualizar el resumen al cambiar el estado del KM
+            calculateAndDisplayKmSummary(date); 
 
         } catch (error) {
             console.error('Error al cargar KM:', error);
@@ -497,7 +551,6 @@ function initializeKilometrajePage() {
         
         const form = e.target;
         const kmValue = form.querySelector('input[name="km_value"]').value;
-        // Asumiendo que solo el formulario de inicio tiene campo 'notas' con ID 'notas_start'
         const notas = document.getElementById('notas_start') ? document.getElementById('notas_start').value : ''; 
         
         if (!kmValue) {
@@ -540,7 +593,7 @@ function initializeKilometrajePage() {
 
 
 // =========================================================
-// LÓGICA DE PRESUPUESTO (CORRECCIÓN CRÍTICA DE TYPEERROR)
+// LÓGICA DE PRESUPUESTO (CORRECCIÓN CRÍTICA Y BOTONES)
 // =========================================================
 
 function initializeBudgetPage() {
@@ -552,17 +605,16 @@ function initializeBudgetPage() {
     // --- Validación de elementos críticos ---
     if (!budgetForm || !budgetListContainer || !budgetMessageDiv) {
         console.error("Error: Elementos principales del Presupuesto no encontrados.");
-        // Este error ocurre si la función se llama en una página que no es presupuesto
         return;
     }
     
-    // --- Lógica Fijo/Variable (CORRECCIÓN CRÍTICA: Se corrige el TypeError) ---
+    // --- Lógica Fijo/Variable ---
     const fijoRadio = document.getElementById('gasto_fijo');
     const variableRadio = document.getElementById('gasto_variable');
     const fechaContainer = document.getElementById('fecha-pago-container');
     const fechaInput = document.getElementById('fecha_pago');
     
-    // CORRECCIÓN CLAVE: Solo si *todos* los elementos condicionales existen, adjuntamos listeners.
+    // CORRECCIÓN CLAVE: Se asegura que los elementos existan
     if (fijoRadio && variableRadio && fechaContainer && fechaInput) { 
         function toggleFechaInput() {
             if (fijoRadio.checked) {
@@ -578,7 +630,6 @@ function initializeBudgetPage() {
         variableRadio.addEventListener('change', toggleFechaInput);
         toggleFechaInput(); // Inicializar el estado
     }
-    // ---------------------------------------------------------------------------------
 
 
     // 3. Función para Cargar y Renderizar Presupuestos (GET)
@@ -616,7 +667,8 @@ function initializeBudgetPage() {
                         <td>
                             ${isPaid ? 
                                 `<span class="text-success me-2">Pagado</span>` : 
-                                `<button class="btn btn-sm btn-info mark-paid-btn me-2" data-row-index="${rowIndex}">Marcar</button>`
+                                // CORRECCIÓN: Usar la clase mark-paid-btn definida en CSS/Home.
+                                `<button class="mark-paid-btn me-2" data-row-index="${rowIndex}">Marcar</button>`
                             }
                             <button class="btn btn-sm btn-danger delete-btn" data-row-index="${rowIndex}">
                                 Eliminar
@@ -818,7 +870,121 @@ function initializeHomeReminders() {
 }
 
 
-// --- FUNCIONES DE INICIALIZACIÓN PENDIENTES (Ahora completas o mantenidas vacías) ---
+// =========================================================
+// LÓGICA DE RESUMEN DIARIO (SUMMARY PAGE)
+// =========================================================
 
-function initializeSummaryPage() {}
-function initializeReportPage() {}
+function initializeSummaryPage() {
+    const fechaInput = document.getElementById('summary_fecha');
+    const resultsDiv = document.getElementById('summary-results');
+    
+    if (!fechaInput || !resultsDiv) return;
+
+    // Función para obtener y mostrar el resumen
+    async function fetchAndDisplaySummary(date) {
+        resultsDiv.innerHTML = '<p>Calculando resumen...</p>';
+
+        try {
+            const response = await fetch(`/api/summary?date=${date}`, {credentials: 'include'});
+            const summary = await response.json();
+
+            if (response.status !== 200) {
+                resultsDiv.innerHTML = `<div class="message-box error">Error al cargar resumen: ${summary.error || 'API Error'}</div>`;
+                return;
+            }
+
+            // Renderizado de la tabla con la clase summary-table
+            let html = `
+                <table class="summary-table">
+                    <thead>
+                        <tr><th>Métrica</th><th>Valor</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Viajes Totales</td><td>${summary.num_trips}</td></tr>
+                        <tr><td>KM Recorrido</td><td>${summary.total_km} KM</td></tr>
+                        <tr><td>Ingreso Bruto</td><td>${formatCurrency(summary.total_income)}</td></tr>
+                        <tr><td>Gasto Total</td><td>${formatCurrency(summary.total_expenses)}</td></tr>
+                        <tr><td>Bono Aplicado</td><td>${formatCurrency(summary.current_bonus)}</td></tr>
+                        <tr><td>Ganancia Neta</td><td><strong>${formatCurrency(summary.net_income)}</strong></td></tr>
+                        <tr><td>Productividad S/KM</td><td><strong>${formatCurrency(summary.productivity_per_km)}/KM</strong></td></tr>
+                    </tbody>
+                </table>
+                ${summary.is_complete ? '' : '<div class="message-box warning mt-3">⚠️ Información incompleta: Asegúrate de registrar viajes y KM final.</div>'}
+            `;
+            
+            resultsDiv.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error al cargar el resumen:', error);
+            resultsDiv.innerHTML = '<div class="message-box error">Error de conexión al generar el resumen.</div>';
+        }
+    }
+
+    // Carga inicial al iniciar la página
+    fetchAndDisplaySummary(fechaInput.value);
+    
+    // El listener de cambio de fecha ya está adjunto en la sección global del DOMContentLoaded
+    // porque 'fechaSummaryInput' (que es summary_fecha) existe.
+}
+
+
+// =========================================================
+// LÓGICA DE REPORTE MENSUAL (REPORTS PAGE)
+// =========================================================
+
+function initializeReportPage() {
+    const reportForm = document.getElementById('reportForm');
+    const reportResultsDiv = document.getElementById('report-results');
+    
+    // Esta función se llama si reportForm existe (que estará en reports.html, si lo creas)
+    if (!reportForm || !reportResultsDiv) return;
+
+    reportForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const month = document.getElementById('month').value;
+        const year = document.getElementById('year').value;
+        
+        reportResultsDiv.innerHTML = '<p>Calculando el reporte mensual...</p>';
+        document.querySelector('button[type="submit"]').disabled = true;
+
+        try {
+            const response = await fetch(`/api/monthly_report?month=${month}&year=${year}`, {credentials: 'include'});
+            const data = await response.json();
+
+            if (response.status !== 200) {
+                reportResultsDiv.innerHTML = `<div class="message-box error">Error: ${data.message || data.error || 'API Error'}</div>`;
+                return;
+            }
+            
+            const report = data.report;
+            
+            // Renderizado de la tabla de resumen mensual
+            let html = `
+                <table class="summary-table">
+                    <thead>
+                        <tr><th>Métrica</th><th>Valor</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Mes / Año</td><td>${report.month} / ${report.year}</td></tr>
+                        <tr><td>KM Recorridos</td><td>${report.total_km.toFixed(0)} KM</td></tr>
+                        <tr><td>Viajes Totales</td><td>${report.total_trips}</td></tr>
+                        <tr><td>Ingreso Bruto Total</td><td>${formatCurrency(report.total_gross_income)}</td></tr>
+                        <tr><td>Bono Total</td><td>${formatCurrency(report.total_bonus)}</td></tr>
+                        <tr><td>Gasto Total</td><td>${formatCurrency(report.total_expenses)}</td></tr>
+                        <tr><td>Ganancia Neta</td><td><strong>${formatCurrency(report.net_income)}</strong></td></tr>
+                        <tr><td>Productividad S/KM</td><td><strong>${formatCurrency(report.productivity_per_km)}/KM</strong></td></tr>
+                    </tbody>
+                </table>
+            `;
+
+            reportResultsDiv.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error al generar el reporte:', error);
+            reportResultsDiv.innerHTML = '<div class="message-box error">Error de conexión al generar el reporte.</div>';
+        } finally {
+            document.querySelector('button[type="submit"]').disabled = false;
+        }
+    });
+}
