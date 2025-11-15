@@ -14,67 +14,34 @@ function formatCurrency(value) {
 document.addEventListener('DOMContentLoaded', function() {
     
     // 1. Inicializar todas las páginas solo si el elemento clave existe.
+    // NOTA: Toda la lógica de listeners de fecha se mueve dentro de estas funciones.
     if (document.getElementById('trip-form')) initializeTripsPage();
-    if (document.getElementById('expense-form')) initializeExpensesPage();
+    if (document.getElementById('expense-form')) initializeExpensesPage(); 
     if (document.getElementById('add-presupuesto-form')) initializeBudgetPage();
     if (document.getElementById('km-state-container')) initializeKilometrajePage(); 
-    if (document.getElementById('extra-form')) initializeExtrasPage();
+    if (document.getElementById('extra-form')) initializeExtrasPage(); 
     if (document.getElementById('summary_fecha')) initializeSummaryPage(); 
     if (document.getElementById('reportForm')) initializeReportPage();
     
     // 2. Inicializar recordatorios de la Home
     if (document.querySelector('.mark-paid-btn')) initializeHomeReminders(); 
-
-    // 3. Escucha global de cambio de fecha (Solo para Gastos, Extras, Kilometraje y Resúmenes Diarios)
-    // NOTA: La lógica de Viajes se maneja ahora *dentro* de initializeTripsPage.
     
-    const fechaExtraInput = document.getElementById('fecha_extra'); 
-    const fechaKmInput = document.getElementById('fecha_km'); 
-    const fechaSummaryInput = document.getElementById('summary_fecha');
-    const fechaGastoInput = document.getElementById('fecha_gasto'); // Usamos un ID específico para Gastos si existe
-
-    // Listener para Gastos (Si usa un ID diferente)
-    if (fechaGastoInput) {
-        fechaGastoInput.addEventListener('change', () => {
-            if (document.getElementById('expense-form')) fetchAndDisplayExpenses(fechaGastoInput.value);
-        });
-    }
-
-    // Listener para Extras
-    if (fechaExtraInput) {
-         fechaExtraInput.addEventListener('change', () => {
-            if (document.getElementById('extra-form')) fetchAndDisplayExtras(fechaExtraInput.value);
-        });
-    }
-
-    // Listener para Kilometraje
-    if (fechaKmInput) { 
-         fechaKmInput.addEventListener('change', () => {
-            if (document.getElementById('km-state-container')) fetchAndDisplayKM(fechaKmInput.value);
-        });
-    }
-    
-    // Listener para Resumen Diario
-    if (fechaSummaryInput) {
-         fechaSummaryInput.addEventListener('change', (e) => {
-            if (document.getElementById('summary-results')) fetchAndDisplaySummary(e.target.value);
-        });
-    }
+    // ELIMINADO: Bloque 3 de escucha global de fechas (Causaba errores de ámbito).
 });
 
 
 // =========================================================
-// LÓGICA DE VIAJES (TRIPS) - AHORA AUTÓNOMA
+// LÓGICA DE VIAJES (TRIPS) - AUTÓNOMA
 // =========================================================
 
 function initializeTripsPage() {
     const tripForm = document.getElementById('trip-form');
     const tripsListDiv = document.getElementById('trips-list');
-    const fechaInput = document.getElementById('fecha_viaje'); // <-- Usamos ID ÚNICO
+    const fechaInput = document.getElementById('fecha_viaje'); 
 
     if (!tripForm || !tripsListDiv || !fechaInput) return;
     
-    // Función de renderizado (GET) - Ahora LOCAL
+    // Función de renderizado (GET) - LOCAL
     async function fetchAndDisplayTrips(date) {
         if (tripsListDiv) tripsListDiv.innerHTML = 'Cargando viajes...';
         try {
@@ -156,7 +123,7 @@ function initializeTripsPage() {
         }
     }
 
-    // ** LÓGICA CLAVE: Listener del cambio de fecha **
+    // ** Listener del cambio de fecha (LOCAL) **
     fechaInput.addEventListener('change', (e) => {
         fetchAndDisplayTrips(e.target.value);
     });
@@ -166,7 +133,7 @@ function initializeTripsPage() {
         e.preventDefault();
         
         const data = {
-            fecha: fechaInput.value, // Usar el valor del input local
+            fecha: fechaInput.value, 
             hora_inicio: tripForm.hora_inicio.value,
             hora_fin: tripForm.hora_fin.value,
             monto: parseFloat(tripForm.monto.value),
@@ -208,7 +175,7 @@ function initializeTripsPage() {
 }
 
 // =========================================================
-// LÓGICA DE EXTRAS
+// LÓGICA DE EXTRAS - AUTÓNOMA (CORREGIDO)
 // =========================================================
 
 function initializeExtrasPage() {
@@ -218,11 +185,8 @@ function initializeExtrasPage() {
     
     if (!extraForm || !extrasListDiv || !fechaExtraInput) return;
 
-    fetchAndDisplayExtras(fechaExtraInput.value); 
-
-    // Función de renderizado (GET)
+    // Función de renderizado (GET) - LOCAL
     async function fetchAndDisplayExtras(date) {
-        // ... (lógica de fetch/render sin cambios)
         extrasListDiv.innerHTML = 'Cargando viajes extra...';
         try {
             const response = await fetch(`/api/extras?date=${date}`, {credentials: 'include'});
@@ -281,12 +245,20 @@ function initializeExtrasPage() {
         }
     }
 
+    // ** Listener del cambio de fecha (LOCAL) **
+    fechaExtraInput.addEventListener('change', (e) => {
+        fetchAndDisplayExtras(e.target.value);
+    });
+
+    // Carga inicial
+    fetchAndDisplayExtras(fechaExtraInput.value);
+
     // Manejar el envío del formulario (POST)
     extraForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const data = {
-            fecha: extraForm.fecha_extra.value, // Usar fecha_extra
+            fecha: fechaExtraInput.value, 
             hora_inicio: extraForm.hora_inicio_extra.value,
             hora_fin: extraForm.hora_fin_extra.value,
             monto: parseFloat(extraForm.monto_extra.value),
@@ -322,21 +294,18 @@ function initializeExtrasPage() {
 
 
 // =========================================================
-// LÓGICA DE GASTOS (EXPENSES)
+// LÓGICA DE GASTOS (EXPENSES) - AUTÓNOMA (CORREGIDO)
 // =========================================================
 
 function initializeExpensesPage() {
     const expenseForm = document.getElementById('expense-form');
     const expensesListDiv = document.getElementById('expenses-list');
-    const fechaInput = document.getElementById('fecha_gasto'); // Usamos ID único para gastos
+    const fechaInput = document.getElementById('fecha_gasto'); // ID único para gastos
     
     if (!expenseForm || !expensesListDiv || !fechaInput) return;
 
-    fetchAndDisplayExpenses(fechaInput.value); 
-
-    // Función de renderizado (GET)
+    // Función de renderizado (GET) - LOCAL
     async function fetchAndDisplayExpenses(date) {
-        // ... (lógica de fetch/render sin cambios)
         expensesListDiv.innerHTML = 'Cargando gastos...';
         try {
             const response = await fetch(`/api/expenses?date=${date}`, {credentials: 'include'});
@@ -393,6 +362,14 @@ function initializeExpensesPage() {
             expensesListDiv.innerHTML = '<div class="message-box alert alert-danger">Error al conectar con la API de gastos.</div>';
         }
     }
+    
+    // ** Listener del cambio de fecha (LOCAL) **
+    fechaInput.addEventListener('change', (e) => {
+        fetchAndDisplayExpenses(e.target.value);
+    });
+    
+    // Carga inicial
+    fetchAndDisplayExpenses(fechaInput.value);
 
     // Manejar el envío del formulario (POST)
     expenseForm.addEventListener('submit', async function(e) {
@@ -437,7 +414,7 @@ function initializeExpensesPage() {
 
 
 // =========================================================
-// LÓGICA DE KILOMETRAJE
+// LÓGICA DE KILOMETRAJE - AUTÓNOMA (CORREGIDO)
 // =========================================================
 
 function initializeKilometrajePage() {
@@ -445,12 +422,12 @@ function initializeKilometrajePage() {
     const kmFormEnd = document.getElementById('km-end-form');
     const kmStateContainer = document.getElementById('km-state-container');
     const fechaKmInput = document.getElementById('fecha_km');
-    const summaryBtn = document.getElementById('calculate-summary-btn'); // Botón de resumen en KM page
-    const summaryResultsDiv = document.getElementById('summary-results'); // Div de resultados en KM page
+    const summaryBtn = document.getElementById('calculate-summary-btn'); 
+    const summaryResultsDiv = document.getElementById('summary-results'); 
 
     if (!kmFormStart || !kmFormEnd || !kmStateContainer || !fechaKmInput) return;
 
-    // Función auxiliar para calcular el resumen de productividad (duplicada intencionalmente para la página KM)
+    // Función auxiliar para calcular el resumen de productividad (LOCAL)
     async function calculateAndDisplayKmSummary(date) {
         if (!summaryResultsDiv) return;
         summaryResultsDiv.innerHTML = '<p>Calculando...</p>';
@@ -486,15 +463,7 @@ function initializeKilometrajePage() {
         }
     }
 
-    // Carga inicial
-    fetchAndDisplayKM(fechaKmInput.value); 
-    // Si el botón de resumen existe, lo adjuntamos a la carga inicial de KM
-    if (summaryBtn) {
-        summaryBtn.addEventListener('click', () => calculateAndDisplayKmSummary(fechaKmInput.value));
-        calculateAndDisplayKmSummary(fechaKmInput.value); // Ejecuta el resumen al cargar la página
-    }
-
-    // Función de renderizado (GET)
+    // Función de renderizado (GET) - LOCAL
     async function fetchAndDisplayKM(date) {
         kmStateContainer.innerHTML = 'Cargando estado de kilometraje...';
         
@@ -544,7 +513,7 @@ function initializeKilometrajePage() {
                  kmStateContainer.innerHTML = `<div class="alert alert-danger">Error al cargar datos: ${data.error || 'Error API'}</div>`;
             }
             
-            // Actualizar el resumen al cambiar el estado del KM
+            // Llama al resumen DEPSUÉS de cargar el estado del KM
             calculateAndDisplayKmSummary(date); 
 
         } catch (error) {
@@ -552,6 +521,21 @@ function initializeKilometrajePage() {
             kmStateContainer.innerHTML = '<div class="alert alert-danger">Error de conexión al servidor de Kilometraje.</div>';
         }
     }
+    
+    // ** Listener del cambio de fecha (LOCAL) **
+    fechaKmInput.addEventListener('change', (e) => {
+        fetchAndDisplayKM(e.target.value);
+    });
+    
+    // Carga inicial
+    fetchAndDisplayKM(fechaKmInput.value);
+
+
+    // Si el botón de resumen existe, lo adjuntamos a la carga inicial de KM
+    if (summaryBtn) {
+        summaryBtn.addEventListener('click', () => calculateAndDisplayKmSummary(fechaKmInput.value));
+    }
+
 
     // Manejar el envío de formularios (POST)
     const handleKmSubmit = async (e, action) => {
@@ -601,33 +585,31 @@ function initializeKilometrajePage() {
 
 
 // =========================================================
-// LÓGICA DE PRESUPUESTO (VERSIÓN FINAL ANTI-NULL)
+// LÓGICA DE PRESUPUESTO
 // =========================================================
 
 function initializeBudgetPage() {
     const PRESUPUESTO_API_URL = '/api/presupuesto';
-    // 1. Elementos principales (Si alguno falta, algo está mal, y el código debería fallar)
+    // 1. Elementos principales
     const budgetForm = document.getElementById('add-presupuesto-form'); 
     const budgetListContainer = document.getElementById('presupuesto-table'); 
     const budgetMessageDiv = document.getElementById('budget-message'); 
 
-    // Este chequeo ya fue hecho en DOMContentLoaded, pero sirve como doble capa.
     if (!budgetForm || !budgetListContainer || !budgetMessageDiv) {
         return; 
     }
     
-    // 2. Elementos condicionales (Los que causaban el error)
+    // 2. Elementos condicionales
     const fijoRadio = document.getElementById('gasto_fijo');
     const variableRadio = document.getElementById('gasto_variable');
     const fechaContainer = document.getElementById('fecha-pago-container');
     const fechaInput = document.getElementById('fecha_pago');
     
-    let toggleFechaInput = null; // Declaramos la función como variable para el ámbito.
+    let toggleFechaInput = null; 
 
-    // Chequeo CRÍTICO: SOLO si TODOS los elementos de radio existen, configuramos los listeners.
+    // Configuración condicional de fecha (solo si existen)
     if (fijoRadio && variableRadio && fechaContainer && fechaInput) { 
         
-        // Función definida localmente (cerrada)
         toggleFechaInput = function() {
             if (fijoRadio.checked) {
                 fechaContainer.style.display = 'block';
@@ -640,7 +622,7 @@ function initializeBudgetPage() {
         
         fijoRadio.addEventListener('change', toggleFechaInput);
         variableRadio.addEventListener('change', toggleFechaInput);
-        toggleFechaInput(); // Inicializar el estado
+        toggleFechaInput(); 
     }
 
 
@@ -705,7 +687,6 @@ function initializeBudgetPage() {
         const tipoGasto = document.querySelector('input[name="tipo_gasto"]:checked') ? document.querySelector('input[name="tipo_gasto"]:checked').value : 'N/A';
         let fechaPago = '';
 
-        // Solo accedemos a fechaInput si sabemos que fue definido y existe
         if (tipoGasto === 'Fijo' && fechaInput) {
             fechaPago = fechaInput.value;
             if (!fechaPago) {
@@ -725,7 +706,7 @@ function initializeBudgetPage() {
         try {
             const response = await fetch(PRESUPUESTO_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data),
                 credentials: 'include'
             });
@@ -737,7 +718,6 @@ function initializeBudgetPage() {
                 budgetMessageDiv.className = 'message-box alert alert-success';
                 budgetForm.reset(); 
                 if (fijoRadio) fijoRadio.checked = true;
-                // Llamamos a la función SOLO si existe (si se definió en el if inicial)
                 if (toggleFechaInput) toggleFechaInput(); 
                 loadBudgets(); 
             } else {
@@ -769,7 +749,7 @@ function initializeBudgetPage() {
                 try {
                     const response = await fetch(PRESUPUESTO_API_URL, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ row_index: rowIndex }),
                         credentials: 'include'
                     });
@@ -795,7 +775,7 @@ function initializeBudgetPage() {
                 try {
                     const response = await fetch(PRESUPUESTO_API_URL, {
                         method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ row_index: rowIndex }),
                         credentials: 'include'
                     });
@@ -850,7 +830,7 @@ function initializeHomeReminders() {
         try {
             const response = await fetch(PRESUPUESTO_API_URL, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ row_index: row_index }),
                 credentials: 'include'
             });
@@ -884,7 +864,7 @@ function initializeHomeReminders() {
 
 
 // =========================================================
-// LÓGICA DE RESUMEN DIARIO (SUMMARY PAGE)
+// LÓGICA DE RESUMEN DIARIO (SUMMARY PAGE) - AUTÓNOMA (CORREGIDO)
 // =========================================================
 
 function initializeSummaryPage() {
@@ -893,7 +873,7 @@ function initializeSummaryPage() {
     
     if (!fechaInput || !resultsDiv) return;
 
-    // Función para obtener y mostrar el resumen
+    // Función para obtener y mostrar el resumen - LOCAL
     async function fetchAndDisplaySummary(date) {
         resultsDiv.innerHTML = '<p>Calculando resumen...</p>';
 
@@ -932,6 +912,11 @@ function initializeSummaryPage() {
             resultsDiv.innerHTML = '<div class="message-box error">Error de conexión al generar el resumen.</div>';
         }
     }
+    
+    // ** Listener del cambio de fecha (LOCAL) **
+    fechaInput.addEventListener('change', (e) => {
+        fetchAndDisplaySummary(e.target.value);
+    });
 
     // Carga inicial al iniciar la página
     fetchAndDisplaySummary(fechaInput.value);
