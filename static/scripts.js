@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('km-state-container')) initializeKilometrajePage(); 
     if (document.getElementById('extra-form')) initializeExtrasPage();
     if (document.getElementById('summary_fecha')) initializeSummaryPage(); 
-    if (document.getElementById('reportForm')) initializeReportPage();
+    if (document.getElementById('reportForm')) initializeReportPage(); // <--- Ahora se llama aquí
     
     // 2. Inicializar recordatorios de la Home
     if (document.querySelector('.mark-paid-btn')) initializeHomeReminders(); 
@@ -593,39 +593,42 @@ function initializeKilometrajePage() {
 
 
 // =========================================================
-// LÓGICA DE PRESUPUESTO (CORRECCIÓN FINAL DE NULL CHECK)
+// LÓGICA DE PRESUPUESTO (VERSIÓN FINAL ANTI-NULL)
 // =========================================================
 
 function initializeBudgetPage() {
     const PRESUPUESTO_API_URL = '/api/presupuesto';
+    // 1. Elementos principales (Si alguno falta, algo está mal, y el código debería fallar)
     const budgetForm = document.getElementById('add-presupuesto-form'); 
     const budgetListContainer = document.getElementById('presupuesto-table'); 
     const budgetMessageDiv = document.getElementById('budget-message'); 
 
-    // --- Validación de elementos críticos ---
+    // Este chequeo ya fue hecho en DOMContentLoaded, pero sirve como doble capa.
     if (!budgetForm || !budgetListContainer || !budgetMessageDiv) {
-        return;
+        return; 
     }
     
-    // --- Lógica Fijo/Variable (Los elementos que causan el error) ---
+    // 2. Elementos condicionales (Los que causaban el error)
     const fijoRadio = document.getElementById('gasto_fijo');
     const variableRadio = document.getElementById('gasto_variable');
     const fechaContainer = document.getElementById('fecha-pago-container');
     const fechaInput = document.getElementById('fecha_pago');
     
-    // CORRECCIÓN FINAL: Solo si *todos* los elementos condicionales existen, adjuntamos listeners y definimos toggleFechaInput.
+    let toggleFechaInput = null; // Declaramos la función como variable para el ámbito.
+
+    // Chequeo CRÍTICO: SOLO si TODOS los elementos de radio existen, configuramos los listeners.
     if (fijoRadio && variableRadio && fechaContainer && fechaInput) { 
-        function toggleFechaInput() {
+        
+        // Función definida localmente (cerrada)
+        toggleFechaInput = function() {
             if (fijoRadio.checked) {
                 fechaContainer.style.display = 'block';
-                // Chequeo de existencia para manipulación de atributos
-                if (fechaInput) fechaInput.setAttribute('required', 'required'); 
+                fechaInput.setAttribute('required', 'required'); 
             } else {
                 fechaContainer.style.display = 'none';
-                 // Chequeo de existencia para manipulación de atributos
-                if (fechaInput) fechaInput.removeAttribute('required'); 
+                fechaInput.removeAttribute('required'); 
             }
-        }
+        };
         
         fijoRadio.addEventListener('change', toggleFechaInput);
         variableRadio.addEventListener('change', toggleFechaInput);
@@ -685,7 +688,7 @@ function initializeBudgetPage() {
     }
 
 
-    // 2. Manejo del Formulario (POST: Crear nuevo presupuesto)
+    // 4. Manejo del Formulario (POST: Crear nuevo presupuesto)
     budgetForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         budgetMessageDiv.innerHTML = 'Procesando...';
@@ -694,7 +697,7 @@ function initializeBudgetPage() {
         const tipoGasto = document.querySelector('input[name="tipo_gasto"]:checked') ? document.querySelector('input[name="tipo_gasto"]:checked').value : 'N/A';
         let fechaPago = '';
 
-        // Solo accedemos a fechaInput si sabemos que existe para gastos Fijos
+        // Solo accedemos a fechaInput si sabemos que fue definido y existe
         if (tipoGasto === 'Fijo' && fechaInput) {
             fechaPago = fechaInput.value;
             if (!fechaPago) {
@@ -726,8 +729,8 @@ function initializeBudgetPage() {
                 budgetMessageDiv.className = 'message-box alert alert-success';
                 budgetForm.reset(); 
                 if (fijoRadio) fijoRadio.checked = true;
-                // Si la función toggleFechaInput fue definida, la llamamos.
-                if (fijoRadio && typeof toggleFechaInput === 'function') toggleFechaInput(); 
+                // Llamamos a la función SOLO si existe (si se definió en el if inicial)
+                if (toggleFechaInput) toggleFechaInput(); 
                 loadBudgets(); 
             } else {
                 const msg = result.message || result.error || 'Error al añadir presupuesto.';
@@ -741,7 +744,7 @@ function initializeBudgetPage() {
         }
     });
 
-    // 4. Asignar Event Listeners para PUT (Marcar Pagado) y DELETE (Eliminar)
+    // 5. Asignar Event Listeners para PUT (Marcar Pagado) y DELETE (Eliminar)
     if (budgetListContainer) {
          budgetListContainer.addEventListener('click', async (event) => {
             const target = event.target;
@@ -935,7 +938,7 @@ function initializeReportPage() {
     const reportForm = document.getElementById('reportForm');
     const reportResultsDiv = document.getElementById('report-results');
     
-    // Esta función se llama si reportForm existe (usado para reportes mensuales si creas la UI)
+    // Esta función se llama si reportForm existe (solo en monthly_report.html)
     if (!reportForm || !reportResultsDiv) return;
 
     reportForm.addEventListener('submit', async function(e) {
@@ -948,6 +951,7 @@ function initializeReportPage() {
         document.querySelector('button[type="submit"]').disabled = true;
 
         try {
+            // Llama a la API con los parámetros del formulario
             const response = await fetch(`/api/monthly_report?month=${month}&year=${year}`, {credentials: 'include'});
             const data = await response.json();
 
@@ -958,7 +962,7 @@ function initializeReportPage() {
             
             const report = data.report;
             
-            // Renderizado de la tabla de resumen mensual
+            // Renderizado de la tabla con los estilos summary-table
             let html = `
                 <table class="summary-table">
                     <thead>
