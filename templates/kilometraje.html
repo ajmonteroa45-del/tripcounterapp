@@ -5,14 +5,109 @@
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4">🚗 Kilometraje Diario</h2>
-    <section class="card p-4 shadow-sm">
+    
+    <section class="card p-4 shadow-sm mb-4">
+        <h3>Estado de la Jornada</h3>
         <label>Fecha:
-            <input type="date" name="fecha" id="km_fecha" class="form-control" 
-                   value="{{ (datetime.utcnow().date()).isoformat() }}">
+            <input type="date" name="fecha_km" id="fecha_km" 
+                   value="{{ today_date }}" class="form-control">
         </label>
+        
         <div id="km-state-container" class="mt-4">
             Cargando estado del kilometraje...
         </div>
     </section>
+
+    <section id="km-start-form" class="card p-4 shadow-sm mb-4" style="display:none;">
+        <h3>Registrar Inicio de Jornada</h3>
+        <form>
+            <label>Kilometraje Actual (Inicio):
+                <input type="number" name="km_value" id="km_value_start" class="form-control" required min="0">
+            </label>
+            <label>Notas de inicio (Opcional):
+                <input type="text" name="notas" id="notas_start" class="form-control">
+            </label>
+            <button type="submit" class="btn" style="background-color: #007bff;">Iniciar KM</button>
+        </form>
+    </section>
+    
+    <section id="km-end-form" class="card p-4 shadow-sm mb-4" style="display:none;">
+        <h3>Registrar Fin de Jornada</h3>
+        <form>
+            <label>Kilometraje Actual (Fin):
+                <input type="number" name="km_value" id="km_value_end" class="form-control" required>
+            </label>
+            <button type="submit" class="btn" style="background-color: #dc3545;">Finalizar KM</button>
+        </form>
+    </section>
+
+    <hr>
+
+    <section class="card p-4 shadow-sm">
+        <h3>Resumen de Productividad Diaria</h3>
+        <p class="text-muted">Calcula el ingreso neto y el valor por kilómetro recorrido para el día seleccionado, basado en Viajes y Gastos.</p>
+        
+        <button id="calculate-summary-btn" class="btn" style="background-color: #28a745;">
+            Generar Resumen
+        </button>
+        
+        <div id="summary-results" class="mt-4">
+            <p>Presiona "Generar Resumen" para ver los resultados.</p>
+        </div>
+    </section>
+
 </div>
+
+<script>
+    // **********************************************
+    // LÓGICA ESPECÍFICA DEL RESUMEN DIARIO (Frontend)
+    // **********************************************
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const calculateBtn = document.getElementById('calculate-summary-btn');
+        const resultsDiv = document.getElementById('summary-results');
+        const fechaInput = document.getElementById('fecha_km');
+        
+        if (!calculateBtn || !resultsDiv || !fechaInput) return;
+
+        calculateBtn.addEventListener('click', async function() {
+            const date = fechaInput.value;
+            resultsDiv.innerHTML = '<p>Calculando...</p>';
+            calculateBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/summary?date=${date}`, {credentials: 'include'});
+                const summary = await response.json();
+
+                if (response.status !== 200) {
+                    resultsDiv.innerHTML = `<div class="message-box error">Error al cargar resumen: ${summary.error || 'API Error'}</div>`;
+                    return;
+                }
+
+                let html = `
+                    <div class="summary-output">
+                        <h4>Resultados para ${date}:</h4>
+                        <p>Total KM Recorrido: <strong>${summary.total_km} KM</strong></p>
+                        <p>Total Ingreso (Viajes + Bono): <strong>${formatCurrency(summary.total_income)}</strong></p>
+                        <p>Total Gastos: <strong class="text-danger">${formatCurrency(summary.total_expenses)}</strong></p>
+                        <hr>
+                        <h4>Ganancia Neta: <strong style="color:#065f46;">${formatCurrency(summary.net_income)}</strong></h4>
+                        <h3>Productividad por KM: 
+                            <strong style="color:#1034A6;">${formatCurrency(summary.productivity_per_km)}/KM</strong>
+                        </h3>
+                        ${summary.is_complete ? '' : '<div class="message-box alert alert-warning mt-3">⚠️ Información incompleta: Asegúrate de registrar viajes y finalizar el KM.</div>'}
+                    </div>
+                `;
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('Error al calcular el resumen:', error);
+                resultsDiv.innerHTML = '<div class="message-box alert alert-danger">Error de conexión al generar el resumen.</div>';
+            } finally {
+                calculateBtn.disabled = false;
+            }
+        });
+    });
+</script>
+
 {% endblock %}
