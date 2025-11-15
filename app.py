@@ -527,8 +527,8 @@ def summary_page():
     
     today_date = date.today().isoformat()
     
-    # Renderizamos la plantilla que contiene el selector de fecha para el resumen diario
-    return render_template("summary.html", 
+    # CORRECCIÓN CLAVE: Renderizar "resumen.html"
+    return render_template("resumen.html", 
                            email=session.get('email'),
                            today_date=today_date)
 # FIN DE RUTA CORREGIDA
