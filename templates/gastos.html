@@ -5,7 +5,7 @@
 {% block content %}
     <div class="container mt-4">
         
-        <h1 class="mb-4">Registrar Gastos Diarios</h1>
+        <h2 class="mb-4">Registrar Gastos Diarios</h2>
         <p class="text-muted">Email actual: {{ email }}</p>
 
         <div class="card p-4 mb-4">
@@ -13,8 +13,9 @@
             <form id="expense-form">
                 <div class="row">
                     <div class="col-md-3 mb-3">
-                        <label for="fecha" class="form-label">Fecha</label>
-                        <input type="date" id="fecha" name="fecha" class="form-control" value="{{ today_date }}" required>
+                        <label for="fecha_gasto" class="form-label">Fecha</label>
+                        <!-- ID ÚNICO CORREGIDO: fecha_gasto -->
+                        <input type="date" id="fecha_gasto" name="fecha" class="form-control" value="{{ today_date }}" required>
                     </div>
                     
                     <div class="col-md-3 mb-3">
@@ -46,6 +47,7 @@
 
         <h2>Gastos del Día</h2>
         <div id="expenses-list">
+            <!-- Contenido cargado por JavaScript -->
             <p class="text-info">Cargando gastos del día...</p>
         </div>
     </div>
