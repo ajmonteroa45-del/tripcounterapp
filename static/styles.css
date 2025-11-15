@@ -172,6 +172,18 @@ body{
     background-color: #6c757d; /* Gris/Secundario */
 }
 
+/* NUEVO ESTILO: Reporte Mensual */
+.nav-btn.btn-reportes {
+    background-color: #5D3FD3; /* Morado/Distintivo */
+    color: #fff;
+    border: 1px solid #4a3399;
+}
+
+.nav-btn.btn-reportes:hover {
+    background-color: #4a3399;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Media Query para pantallas pequeñas (móviles) */
 @media (max-width: 600px) {
     .nav-btn {
@@ -256,3 +268,4 @@ input:focus, select:focus, textarea:focus {
     cursor: not-allowed;
     opacity: 0.6;
 }
+
