@@ -636,8 +636,10 @@ def api_extras():
         return jsonify({"error":"not_authenticated"}), 401
     try:
         client = get_gspread_client()
+        # Aquí se usa el EXTRAS_SHEET_ID que ya confirmaste haber agregado en Render.
         ws = ensure_sheet_with_headers(client, EXTRAS_WS_NAME, EXTRAS_HEADERS)
     except Exception as e:
+        # Si la conexión falla ahora, es por un error de permisos o un problema con el ID, no por falta de la variable.
         app.logger.error(f"Error en API Extras al conectar a GSheets: {e}")
         return jsonify({"error": f"Error de conexión a la base de datos: {e}"}), 500
 
