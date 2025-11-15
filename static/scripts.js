@@ -2,7 +2,7 @@
    scripts.js: Lógica de Interacción con la API de Flask
    ========================================================= */
 
-// --- Utilidad ---
+// --- Utilidad (Hecha Global para ser accesible desde cualquier plantilla HTML) ---
 function formatCurrency(value) {
     return `S/${parseFloat(value).toFixed(2)}`;
 }
@@ -17,10 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('trip-form')) initializeTripsPage();
     if (document.getElementById('expense-form')) initializeExpensesPage();
     
-    // CORRECCIÓN: Llamamos a la función SOLO si el formulario principal existe
+    // CORRECCIÓN CRÍTICA DE PRESUPUESTO: Llamamos a la función SOLO si el formulario principal existe
     if (document.getElementById('add-presupuesto-form')) initializeBudgetPage();
     
-    if (document.getElementById('km-state-container')) initializeKilometrajePage(); // NUEVA FUNCIÓN: Inicializar Kilometraje
+    if (document.getElementById('km-state-container')) initializeKilometrajePage(); 
     if (document.getElementById('extra-form')) initializeExtrasPage();
     if (document.getElementById('summary_fecha')) initializeSummaryPage(); 
     if (document.getElementById('reportForm')) initializeReportPage();
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 3. Escucha global de cambio de fecha (si el input existe)
     const fechaInput = document.getElementById('fecha'); // Usado por Viajes y Gastos
     const fechaExtraInput = document.getElementById('fecha_extra'); 
-    const fechaKmInput = document.getElementById('fecha_km'); // NUEVO: para Kilometraje
+    const fechaKmInput = document.getElementById('fecha_km'); 
     
     // Listener para Viajes y Gastos
     if (fechaInput) {
@@ -421,7 +421,7 @@ function initializeExpensesPage() {
 
 
 // =========================================================
-// LÓGICA DE KILOMETRAJE (NUEVA IMPLEMENTACIÓN)
+// LÓGICA DE KILOMETRAJE
 // =========================================================
 
 function initializeKilometrajePage() {
@@ -818,7 +818,7 @@ function initializeHomeReminders() {
 }
 
 
-// --- FUNCIONES DE INICIALIZACIÓN PENDIENTES (Placeholders que ya no están vacíos) ---
+// --- FUNCIONES DE INICIALIZACIÓN PENDIENTES (Ahora completas o mantenidas vacías) ---
 
 function initializeSummaryPage() {}
 function initializeReportPage() {}
