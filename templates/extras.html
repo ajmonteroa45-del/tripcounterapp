@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Registrar Extras{% endblock %}
+{% block title %}Registrar Viajes Extra{% endblock %}
 
 {% block content %}
     <div class="container mt-4">
@@ -8,8 +8,8 @@
         <a href="{{ url_for('viajes_page') }}" class="btn btn-info mb-4">
             Volver a Registrar Viajes 🚗
         </a>
-        <hr>
-        <h1 class="mb-4">Registrar Viajes Extra</h1>
+        
+        <h2 class="mb-4">Registrar Viajes Extra</h2>
         
         <section class="card p-4 mb-4">
             <h3>Nuevo Viaje Extra</h3>
@@ -17,7 +17,8 @@
                 <div class="row">
                     <div class="col-md-3 mb-3">
                         <label for="fecha_extra" class="form-label">Fecha</label>
-                        <input type="date" name="fecha" id="fecha_extra" class="form-control" value="{{ today_date }}" required>
+                        <!-- ID ÚNICO: fecha_extra -->
+                        <input type="date" name="fecha_extra" id="fecha_extra" class="form-control" value="{{ today_date }}" required>
                     </div>
                     
                     <div class="col-md-3 mb-3">
@@ -43,6 +44,7 @@
         <section class="card p-4">
             <h3>Viajes Extra del Día</h3>
             <div id="extras-list">
+                <!-- Contenido cargado por JavaScript -->
                 <p class="text-info">Cargando viajes extra...</p>
             </div>
         </section>
