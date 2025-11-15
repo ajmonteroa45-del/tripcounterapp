@@ -8,9 +8,8 @@ from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import service_account
-import gspread
-import base64
 from google.oauth2.service_account import Credentials
+import gspread
 import gspread.exceptions
 
 # ----------------------------
@@ -26,7 +25,6 @@ CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET")
 REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI")
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
-SERVICE_ACCOUNT_FILE = os.environ.get("SERVICE_ACCOUNT_FILE", "tripcounter-service-account.json")
 
 if not FLASK_SECRET_KEY:
     app.logger.warning("⚠️ FLASK_SECRET_KEY not set - using temporary key.")
@@ -38,7 +36,6 @@ else:
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = ["openid", "email", "profile"]
-GSHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
 
 # Fixed airport fee
 AIRPORT_FEE = 6.50
@@ -55,7 +52,6 @@ BONUS_RULES = {
 }
 GASTOS_WS_NAME = "TripCounter_Gastos"
 GASTOS_HEADERS = ["Fecha", "Hora", "Monto", "Categoría", "Descripción"]
-# MODIFICADO: Añadida columna 'Tipo'
 PRESUPUESTO_WS_NAME = "TripCounter_Presupuesto"
 PRESUPUESTO_HEADERS = ["alias", "categoria", "monto", "tipo", "fecha_pago", "pagado"] 
 EXTRAS_WS_NAME = "TripCounter_Extras"
@@ -80,7 +76,6 @@ PRESUPUESTO_SHEET_ID = os.environ.get("PRESUPUESTO_SHEET_ID")
 TRIPS_SHEET_ID = os.environ.get("TRIPS_SHEET_ID")
 BONUS_SHEET_ID = os.environ.get("BONUS_SHEET_ID")
 GASTOS_SHEET_ID = os.environ.get("GASTOS_SHEET_ID")
-# CORRECCIÓN: Variable de entorno para Extras
 EXTRAS_SHEET_ID = os.environ.get("EXTRAS_SHEET_ID")
 KM_SHEET_ID = os.environ.get("KM_SHEET_ID")
 SUMMARIES_SHEET_ID = os.environ.get("SUMMARIES_SHEET_ID")
@@ -94,7 +89,6 @@ def startup_debug():
     """Imprime variables de entorno clave solo una vez."""
     if not getattr(app, "_startup_debug_done", False):
         print("⚙️ DEBUG desde Flask startup:")
-        # ACTUALIZADO: Chequeo de todos los IDs, incluyendo EXTRAS_SHEET_ID
         for key in ["GSPREAD_CLIENT_EMAIL", "FLASK_SECRET_KEY", "OAUTH_CLIENT_ID", "PRESUPUESTO_SHEET_ID", "TRIPS_SHEET_ID", "BONUS_SHEET_ID", "GASTOS_SHEET_ID", "EXTRAS_SHEET_ID", "KM_SHEET_ID", "SUMMARIES_SHEET_ID"]:
             print(f"{key}: {'✅ OK' if os.getenv(key) else '❌ MISSING'}")
         app._startup_debug_done = True
@@ -158,7 +152,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
         "TripCounter_Trips": TRIPS_SHEET_ID,
         "TripCounter_Bonuses": BONUS_SHEET_ID,
         "TripCounter_Gastos": GASTOS_SHEET_ID,
-        "TripCounter_Extras": EXTRAS_SHEET_ID, # CORRECCIÓN: Añadido Extras
+        "TripCounter_Extras": EXTRAS_SHEET_ID,
         "TripCounter_Kilometraje": KM_SHEET_ID,
         "TripCounter_Summaries": SUMMARIES_SHEET_ID,
     }
@@ -226,7 +220,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
 
 
 # ----------------------------
-# FUNCIONES DE LÓGICA DE NEGOCIO (El resto del código se mantiene igual)
+# FUNCIONES DE LÓGICA DE NEGOCIO
 # ----------------------------
 def get_bonus_type(day_of_week):
     """Retorna la clave del tipo de bono basado en el día (0=Lunes, 6=Domingo)"""
@@ -524,6 +518,23 @@ def presupuesto_page():
     if not session.get('email'):
         return redirect(url_for("login"))
     return render_template("presupuesto.html", email=session.get('email'))
+
+# RUTA NUEVA: Para la UI de Reporte Mensual (Solución al error de navegación)
+@app.route("/resumenes")
+def reports_page():
+    if not session.get('email'):
+        return redirect(url_for("login"))
+    
+    # Obtener el mes y año actual como valores predeterminados
+    today = date.today()
+    default_month = today.month
+    default_year = today.year
+    
+    return render_template("reports.html", 
+                           email=session.get('email'),
+                           default_month=default_month,
+                           default_year=default_year)
+# FIN DE RUTA NUEVA
 
 # ----------------------------
 # API: Trips (Ruta Unificada)
