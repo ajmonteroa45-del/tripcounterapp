@@ -1,4 +1,4 @@
-<a href="{{ url_for('api_monthly_report') }}" class="nav-btn <!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -29,7 +29,9 @@
         <a href="{{ url_for('presupuesto_page') }}" class="nav-btn btn-presupuesto">Presupuesto</a>
         <a href="{{ url_for('kilometraje_page') }}" class="nav-btn btn-kilometraje">Kilometraje</a> 
         
-        <a href="{{ url_for('summary_page') }}" class="nav-btn btn-resumenes">Resúmenes</a>
+        <a href="{{ url_for('summary_page') }}" class="nav-btn btn-resumenes">Resúmenes Diarios</a>
+        
+        <a href="{{ url_for('monthly_report_page') }}" class="nav-btn btn-reportes">Reporte Mensual</a>
         
     </div>
   </nav>
@@ -51,4 +53,3 @@
   <script src="{{ url_for('static', filename='scripts.js') }}"></script>
 </body>
 </html>
-
