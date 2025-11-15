@@ -8,10 +8,10 @@
   --success-text: #065f46;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
-  /* Nuevas variables para la tabla */
-  --table-header-bg: #28a745; /* Verde fuerte para la cabecera (similar a la imagen) */
-  --table-row-odd: #ffffff;   /* Blanco para filas impares */
-  --table-row-even: #f0f8ff;  /* Azul muy claro para filas pares */
+  /* Variables para la tabla */
+  --table-header-bg: #28a745; 
+  --table-row-odd: #ffffff;   
+  --table-row-even: #f0f8ff;  
 }
 
 body{
@@ -22,16 +22,9 @@ body{
 }
 
 /* --- Layout --- */
-.topbar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:12px 16px;
-  border-bottom:1px solid #e6e6e6;
-  background:white;
-}
+/* Eliminamos topbar ya que fue reemplazado por el sidebar en base.html */
+/* .topbar, .brand, .nav-links quedan obsoletos por el nuevo diseño */
 
-.brand{ font-weight:700; font-size:18px; color:var(--primary); }
 .container{ max-width:920px; margin:20px auto; padding:0 16px; }
 
 .card{
@@ -65,161 +58,61 @@ body{
 /* --- ESTILOS DE TABLA (SUMMARY-TABLE) --- */
 /* ---------------------------------------------------------------------- */
 
-/* Estilo base para las tablas de resumen */
 .summary-table {
     width: 100%;
-    border-collapse: collapse; /* Elimina doble borde */
+    border-collapse: collapse; 
     margin-top: 15px;
     font-size: 14px;
 }
 
 .summary-table thead th {
-    background-color: var(--table-header-bg); /* Fondo de cabecera verde */
+    background-color: var(--table-header-bg); 
     color: white;
-    padding: 10px 8px; /* Más espaciado en cabecera */
+    padding: 10px 8px; 
     text-align: left;
     border: none;
 }
 
 .summary-table tbody tr {
-    /* Fondo para filas impares */
     background-color: var(--table-row-odd); 
-    border-bottom: 1px solid #e5e7eb; /* Separador sutil */
+    border-bottom: 1px solid #e5e7eb; 
 }
 
-/* Rayas de cebra: Fondo para filas pares */
 .summary-table tbody tr:nth-child(even) {
     background-color: var(--table-row-even); 
 }
 
 .summary-table td {
-    padding: 8px 8px; /* Espaciado interno de celdas */
+    padding: 8px 8px; 
     vertical-align: middle;
     border: none;
 }
 
-/* Colores específicos para totales dentro de las tablas */
 .summary-table td strong {
     font-weight: 700;
 }
 
 /* ---------------------------------------------------------------------- */
-/* --- NUEVOS ESTILOS PARA LA BARRA DE NAVEGACIÓN GLOBAL (MAIN-NAV) --- */
+/* --- ESTILOS DE NAVEGACIÓN ANTERIOR (ELIMINADOS/DEPRECACIÓN LIMPIA) --- */
 /* ---------------------------------------------------------------------- */
+/* Se eliminaron las clases .main-nav-buttons, .nav-button-container, .nav-btn, .btn-home, etc., ya que ahora están en base.html o son obsoletas. */
 
-.main-nav-buttons {
-    padding: 10px 16px; /* Padding ajustado para coincidir con el layout */
-    background-color: var(--card); /* Fondo ligero para la barra */
-    border-bottom: 1px solid #dee2e6;
-}
-
-.nav-button-container {
-    display: flex;
-    flex-wrap: wrap; 
-    gap: 10px; /* Espacio prudente entre los botones */
-    justify-content: center; /* Centrar los botones horizontalmente */
-    max-width: 920px; /* Limitar el ancho del contenedor de botones */
-    margin: 0 auto;
-}
-
-.nav-btn {
-    /* Estilos generales que simulan el botón que deseas */
-    display: block; 
-    padding: 8px 12px;
-    border-radius: 6px;
-    text-decoration: none;
-    color: white; 
-    font-weight: 600;
-    text-align: center;
-    transition: background-color 0.2s, opacity 0.2s;
-    flex-grow: 1; 
-    flex-basis: auto; 
-    min-width: 120px; 
-    white-space: nowrap; 
-}
-
-.nav-btn:hover {
-    opacity: 0.9;
-}
-
-/* Colores de Botón Específicos */
-.btn-home {
-    background-color: #007bff; /* Azul */
-}
-
-.btn-viajes {
-    background-color: #28a745; /* Verde */
-}
-
-.btn-extras {
-    background-color: #ffc107; /* Amarillo/Advertencia */
-    color: var(--text); /* Texto oscuro para fondo claro */
-}
-
-.btn-gastos {
-    background-color: #dc3545; /* Rojo/Peligro */
-}
-
-.btn-presupuesto {
-    background-color: #17a2b8; /* Cyan/Info */
-}
-
-.btn-kilometraje {
-    background-color: #f7941d; /* Naranja/Kilometraje */
-}
-
-.btn-resumenes {
-    background-color: #6c757d; /* Gris/Secundario */
-}
-
-/* NUEVO ESTILO: Reporte Mensual */
-.nav-btn.btn-reportes {
-    background-color: #5D3FD3; /* Morado/Distintivo */
-    color: #fff;
-    border: 1px solid #4a3399;
-}
-
-.nav-btn.btn-reportes:hover {
-    background-color: #4a3399;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* Media Query para pantallas pequeñas (móviles) */
-@media (max-width: 600px) {
-    .nav-btn {
-        flex-basis: 45%; /* Dos botones por fila en móviles */
-    }
-}
-
-/* ---------------------------------------------------------------------- */
-/* --- FIN DE ESTILOS DE NAVEGACIÓN --- */
-/* ---------------------------------------------------------------------- */
-
-
-/* --- Navegación Anterior (DEPRECADA, MANTENIDA POR SI ACASO) --- */
-.nav-links a{
-  display:inline-block;
-  margin-right:10px;
-  color:var(--primary);
-  text-decoration:underline;
-}
-
-/* --- Formularios (Mejorado para consistencia y responsive) --- */
+/* --- Formularios (Mantenidos) --- */
 label{ display:block; margin-bottom:8px; }
 input[type="text"], 
 input[type="number"], 
 input[type="time"], 
 input[type="date"],
-select, /* Nuevo */
-textarea { /* Nuevo */
+select, 
+textarea { 
   display:block;
   padding:8px;
-  width:100%; /* Ajustado a 100% para mejor responsive */
+  width:100%; 
   margin-top:6px;
   margin-bottom:10px;
   border-radius:6px;
   border:1px solid #e5e7eb;
-  box-sizing: border-box; /* Crucial para evitar que el padding desborde el ancho */
+  box-sizing: border-box; 
 }
 input:focus, select:focus, textarea:focus {
     border-color: var(--primary);
@@ -228,7 +121,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 
-/* --- Mensajes de Estado y Notificaciones (Nuevas Clases) --- */
+/* --- Mensajes de Estado y Notificaciones (Mantenidos) --- */
 
 #message, .message-box {
   padding: 12px;
@@ -249,9 +142,8 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid #fecaca;
 }
 
-/* --- Estilo de Botón Específico para Recordatorios de Pago --- */
+/* --- Estilo de Botón Específico para Recordatorios de Pago (Mantenido) --- */
 .mark-paid-btn {
-  /* Estilo más discreto que el botón principal */
   background: #f0f0f0;
   color: var(--text);
   padding: 6px 10px;
@@ -268,4 +160,3 @@ input:focus, select:focus, textarea:focus {
     cursor: not-allowed;
     opacity: 0.6;
 }
-
