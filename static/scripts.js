@@ -1,5 +1,5 @@
 /* =========================================================
-   scripts.js: Lógica de Interacción con la API de Flask (CORRECCIÓN FINAL)
+   scripts.js: Lógica de Interacción con la API de Flask
    ========================================================= */
 
 // --- Utilidad ---
@@ -17,10 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('trip-form')) initializeTripsPage();
     if (document.getElementById('expense-form')) initializeExpensesPage();
     
-    // CORRECCIÓN CRÍTICA DE PRESUPUESTO: Llamamos a la función SOLO si el formulario principal existe
+    // CORRECCIÓN: Llamamos a la función SOLO si el formulario principal existe
     if (document.getElementById('add-presupuesto-form')) initializeBudgetPage();
     
-    if (document.getElementById('km-state-container')) initializeKilometrajePage();
+    if (document.getElementById('km-state-container')) initializeKilometrajePage(); // NUEVA FUNCIÓN: Inicializar Kilometraje
     if (document.getElementById('extra-form')) initializeExtrasPage();
     if (document.getElementById('summary_fecha')) initializeSummaryPage(); 
     if (document.getElementById('reportForm')) initializeReportPage();
@@ -29,21 +29,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.querySelector('.mark-paid-btn')) initializeHomeReminders(); 
 
     // 3. Escucha global de cambio de fecha (si el input existe)
-    const fechaInput = document.getElementById('fecha');
+    const fechaInput = document.getElementById('fecha'); // Usado por Viajes y Gastos
     const fechaExtraInput = document.getElementById('fecha_extra'); 
+    const fechaKmInput = document.getElementById('fecha_km'); // NUEVO: para Kilometraje
     
+    // Listener para Viajes y Gastos
     if (fechaInput) {
         fechaInput.addEventListener('change', () => {
             if (document.getElementById('trip-form')) fetchAndDisplayTrips(fechaInput.value);
-            // El formulario de Gastos (expenses.html) usa el ID 'fecha'.
             if (document.getElementById('expense-form')) fetchAndDisplayExpenses(fechaInput.value);
         });
     }
     
-    // Escucha para la página de Extras (usa 'fecha_extra' como ID)
+    // Listener para Extras
     if (fechaExtraInput) {
          fechaExtraInput.addEventListener('change', () => {
             if (document.getElementById('extra-form')) fetchAndDisplayExtras(fechaExtraInput.value);
+        });
+    }
+
+    // Listener para Kilometraje
+    if (fechaKmInput) { 
+         fechaKmInput.addEventListener('change', () => {
+            if (document.getElementById('km-state-container')) fetchAndDisplayKM(fechaKmInput.value);
         });
     }
 });
@@ -54,11 +62,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // =========================================================
 
 function initializeTripsPage() {
-    // ... (Tu código de initializeTripsPage)
     const tripForm = document.getElementById('trip-form');
     const tripsListDiv = document.getElementById('trips-list');
     
-    // Función de renderizado (GET) - Código original
+    // Función de renderizado (GET)
     async function fetchAndDisplayTrips(date) {
         if (tripsListDiv) tripsListDiv.innerHTML = 'Cargando viajes...';
         try {
@@ -140,7 +147,7 @@ function initializeTripsPage() {
         }
     }
 
-    // Manejar el envío del formulario (POST) - Código original
+    // Manejar el envío del formulario (POST)
     tripForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -187,7 +194,7 @@ function initializeTripsPage() {
 }
 
 // =========================================================
-// LÓGICA DE EXTRAS (NUEVO)
+// LÓGICA DE EXTRAS
 // =========================================================
 
 function initializeExtrasPage() {
@@ -197,7 +204,7 @@ function initializeExtrasPage() {
     
     if (!extraForm || !extrasListDiv || !fechaExtraInput) return;
 
-    fetchAndDisplayExtras(fechaExtraInput.value); // Carga inicial
+    fetchAndDisplayExtras(fechaExtraInput.value); 
 
     // Función de renderizado (GET)
     async function fetchAndDisplayExtras(date) {
@@ -264,7 +271,7 @@ function initializeExtrasPage() {
         e.preventDefault();
         
         const data = {
-            fecha: extraForm.fecha.value,
+            fecha: extraForm.fecha_extra.value, // Usar fecha_extra
             hora_inicio: extraForm.hora_inicio_extra.value,
             hora_fin: extraForm.hora_fin_extra.value,
             monto: parseFloat(extraForm.monto_extra.value),
@@ -300,18 +307,17 @@ function initializeExtrasPage() {
 
 
 // =========================================================
-// LÓGICA DE GASTOS (EXPENSES) (NUEVO)
+// LÓGICA DE GASTOS (EXPENSES)
 // =========================================================
 
 function initializeExpensesPage() {
-    // Nota: El formulario de Gastos debe usar 'fecha' como ID de fecha
     const expenseForm = document.getElementById('expense-form');
     const expensesListDiv = document.getElementById('expenses-list');
     const fechaInput = document.getElementById('fecha'); 
     
     if (!expenseForm || !expensesListDiv || !fechaInput) return;
 
-    fetchAndDisplayExpenses(fechaInput.value); // Carga inicial
+    fetchAndDisplayExpenses(fechaInput.value); 
 
     // Función de renderizado (GET)
     async function fetchAndDisplayExpenses(date) {
@@ -415,43 +421,149 @@ function initializeExpensesPage() {
 
 
 // =========================================================
-// LÓGICA DE PRESUPUESTO (Funciones Consolidadas) - Mantenido sin cambios
+// LÓGICA DE KILOMETRAJE (NUEVA IMPLEMENTACIÓN)
+// =========================================================
+
+function initializeKilometrajePage() {
+    const kmFormStart = document.getElementById('km-start-form');
+    const kmFormEnd = document.getElementById('km-end-form');
+    const kmStateContainer = document.getElementById('km-state-container');
+    const fechaKmInput = document.getElementById('fecha_km');
+
+    if (!kmFormStart || !kmFormEnd || !kmStateContainer || !fechaKmInput) return;
+
+    // Carga inicial
+    fetchAndDisplayKM(fechaKmInput.value); 
+
+    // Función de renderizado (GET)
+    async function fetchAndDisplayKM(date) {
+        kmStateContainer.innerHTML = 'Cargando estado de kilometraje...';
+        
+        try {
+            const response = await fetch(`/api/kilometraje?date=${date}`, {credentials: 'include'});
+            const data = await response.json();
+            
+            // Ocultar ambos formularios inicialmente
+            kmFormStart.style.display = 'none';
+            kmFormEnd.style.display = 'none';
+
+            if (response.status === 200 && data.status === "no_record") {
+                // Caso 1: No hay registro (Mostrar START)
+                kmStateContainer.innerHTML = '<div class="alert alert-info">No se ha iniciado el registro de KM.</div>';
+                kmFormStart.style.display = 'block';
+                kmFormEnd.style.display = 'none';
+            } else if (response.ok && data.hasOwnProperty('KM Inicio')) {
+                const kmInicio = parseInt(data['KM Inicio']);
+                const kmFin = data['KM Fin'];
+                const recorrido = data.Recorrido;
+                
+                let html = `
+                    <div class="card bg-light p-3">
+                        <p>KM de Inicio: <strong>${kmInicio}</strong></p>
+                        <p>Notas: ${data.Notas || 'N/A'}</p>
+                `;
+
+                if (kmFin) {
+                    // Caso 3: Registro Completo
+                    html += `
+                        <p>KM Final: <strong class="text-success">${kmFin}</strong></p>
+                        <h3>Recorrido Total: <strong class="text-primary">${recorrido} KM</strong></h3>
+                    `;
+                    kmFormStart.style.display = 'none';
+                    kmFormEnd.style.display = 'none';
+                } else {
+                    // Caso 2: Registro Iniciado (Mostrar END)
+                    html += `<div class="alert alert-warning">KM Final Pendiente.</div>`;
+                    kmFormEnd.style.display = 'block';
+                    // Asegura que el KM final no sea menor al inicial
+                    document.getElementById('km_value_end').min = kmInicio; 
+                }
+
+                html += `</div>`;
+                kmStateContainer.innerHTML = html;
+            } else {
+                 kmStateContainer.innerHTML = `<div class="alert alert-danger">Error al cargar datos: ${data.error || 'Error API'}</div>`;
+            }
+
+        } catch (error) {
+            console.error('Error al cargar KM:', error);
+            kmStateContainer.innerHTML = '<div class="alert alert-danger">Error de conexión al servidor de Kilometraje.</div>';
+        }
+    }
+
+    // Manejar el envío de formularios (POST)
+    const handleKmSubmit = async (e, action) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        const kmValue = form.querySelector('input[name="km_value"]').value;
+        // Asumiendo que solo el formulario de inicio tiene campo 'notas' con ID 'notas_start'
+        const notas = document.getElementById('notas_start') ? document.getElementById('notas_start').value : ''; 
+        
+        if (!kmValue) {
+            alert("Debe ingresar un valor de kilometraje.");
+            return;
+        }
+
+        const data = {
+            km_value: kmValue,
+            action: action,
+            fecha: fechaKmInput.value,
+            notas: notas
+        };
+        
+        try {
+            const response = await fetch('/api/kilometraje', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data),
+                credentials: 'include'
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert(action === 'start' ? `KM de inicio ${result.km_inicio} registrado.` : `KM de fin ${result.km_fin} registrado. Recorrido: ${result.recorrido} KM.`);
+                fetchAndDisplayKM(data.fecha);
+                form.reset();
+            } else {
+                alert(`Error al registrar KM: ${result.message || result.error || response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error de red:', error);
+            alert('Error al conectar con el servidor.');
+        }
+    };
+
+    kmFormStart.addEventListener('submit', (e) => handleKmSubmit(e, 'start'));
+    kmFormEnd.addEventListener('submit', (e) => handleKmSubmit(e, 'end'));
+}
+
+
+// =========================================================
+// LÓGICA DE PRESUPUESTO (CORRECCIÓN CRÍTICA DE TYPEERROR)
 // =========================================================
 
 function initializeBudgetPage() {
     const PRESUPUESTO_API_URL = '/api/presupuesto';
     const budgetForm = document.getElementById('add-presupuesto-form'); 
     const budgetListContainer = document.getElementById('presupuesto-table'); 
-    const budgetMessageDiv = document.getElementById('budget-message') || document.createElement('div'); 
+    const budgetMessageDiv = document.getElementById('budget-message'); 
 
     // --- Validación de elementos críticos ---
-    if (!budgetForm || !budgetListContainer) {
-        console.error("Error: Elementos principales del Presupuesto (formulario o tabla) no encontrados.");
+    if (!budgetForm || !budgetListContainer || !budgetMessageDiv) {
+        console.error("Error: Elementos principales del Presupuesto no encontrados.");
+        // Este error ocurre si la función se llama en una página que no es presupuesto
         return;
     }
     
-    // Lógica del mensaje de feedback
-    if (!budgetMessageDiv.id) {
-        budgetMessageDiv.id = 'budget-message';
-        const parentContainer = budgetListContainer.closest('.container');
-        if (parentContainer) {
-            parentContainer.prepend(budgetMessageDiv);
-        } else {
-            console.warn("No se pudo prependear el mensaje de presupuesto. Mostrando en consola.");
-        }
-    }
-    
-    // --- Lógica Fijo/Variable (CRÍTICO: Deben existir los elementos) ---
+    // --- Lógica Fijo/Variable (CORRECCIÓN CRÍTICA: Se corrige el TypeError) ---
     const fijoRadio = document.getElementById('gasto_fijo');
     const variableRadio = document.getElementById('gasto_variable');
     const fechaContainer = document.getElementById('fecha-pago-container');
     const fechaInput = document.getElementById('fecha_pago');
     
-    // CORRECCIÓN FINAL: Si algún elemento del radio button falta, detenemos la lógica condicional.
-    if (!fijoRadio || !variableRadio || !fechaContainer || !fechaInput) {
-        console.error("Error CRÍTICO: Faltan elementos de Fijo/Variable en el HTML del Presupuesto.");
-        // Permitimos que la carga de datos continúe, pero sin la lógica Fijo/Variable
-    } else {
+    // CORRECCIÓN CLAVE: Solo si *todos* los elementos condicionales existen, adjuntamos listeners.
+    if (fijoRadio && variableRadio && fechaContainer && fechaInput) { 
         function toggleFechaInput() {
             if (fijoRadio.checked) {
                 fechaContainer.style.display = 'block';
@@ -644,13 +756,12 @@ function initializeBudgetPage() {
 
 
 // =========================================================
-// LÓGICA DE RECORDATORIOS HOME (Marcar Pagado) - Mantenido sin cambios
+// LÓGICA DE RECORDATORIOS HOME
 // =========================================================
 
 function initializeHomeReminders() {
     const PRESUPUESTO_API_URL = '/api/presupuesto';
     const paidButtons = document.querySelectorAll('.mark-paid-btn');
-    // Nota: El DOM de Home no tiene .delete-btn, solo lo tiene la página de Presupuesto.
     
     const handleHomeAction = async (event, method) => {
         const target = event.target;
@@ -663,7 +774,6 @@ function initializeHomeReminders() {
         if (method === 'PUT') {
             confirmMsg = `¿Estás seguro de que quieres marcar "${category}" como pagado?`;
         } else {
-            // No deberíamos llegar aquí si solo se usan botones PUT en Home.
             return;
         }
 
@@ -708,10 +818,7 @@ function initializeHomeReminders() {
 }
 
 
-// --- FUNCIONES DE INICIALIZACIÓN FALTANTES (Placeholders) ---
-// Mantenemos estas funciones vacías si su implementación no fue compartida,
-// pero ya no son necesarias ya que hemos implementado Extras y Expenses.
+// --- FUNCIONES DE INICIALIZACIÓN PENDIENTES (Placeholders que ya no están vacíos) ---
 
-function initializeKilometrajePage() {}
 function initializeSummaryPage() {}
 function initializeReportPage() {}
