@@ -1,55 +1,187 @@
-<!doctype html>
+{% from 'macros.html' import nav_link %}
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Trip Counter | {% block title %}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trip Counter{% endblock %}</title>
+    <!-- Incluir Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Enlace al archivo de estilos estático si es necesario -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
+    <style>
+        /* 1. Estilos para el Layout (Sidebar y Contenido) */
+        .wrapper {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* 2. Estilos para la Barra Lateral (Sidebar) - Vertical */
+        #sidebar {
+            min-width: 250px;
+            max-width: 250px;
+            background: #2c3e50; /* Color oscuro para el fondo */
+            color: #ecf0f1; /* Color claro para el texto */
+            transition: all 0.3s;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Centrar logo y título */
+        }
+        
+        /* 3. Estilos del Encabezado (Logo y Título Grande) */
+        .sidebar-header {
+            width: 100%;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .sidebar-header img {
+            width: 100px; /* Tamaño del logo */
+            margin-bottom: 10px;
+        }
+
+        .sidebar-header h3 {
+            font-size: 2.2rem; /* Mucho más grande */
+            font-weight: 700;
+            color: #f39c12; /* Color de acento para el título */
+            margin-bottom: 0;
+        }
+
+        /* 4. Estilos de la Navegación Vertical */
+        #sidebar ul.components {
+            padding: 20px 0;
+            border-bottom: 1px solid #475a6e;
+            width: 100%;
+        }
+
+        #sidebar ul li {
+            padding: 0;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        
+        /* Estilo para los botones de navegación */
+        #sidebar ul li a {
+            display: block;
+            text-align: left; /* Alineación a la izquierda */
+            padding: 10px 15px;
+            font-size: 1.1em;
+            color: #ecf0f1;
+            background: #34495e; /* Fondo del botón */
+            border-radius: 5px;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #sidebar ul li a:hover {
+            background: #1abc9c; /* Verde turquesa al pasar el mouse */
+            color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Contenido principal */
+        #content {
+            width: 100%;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        /* Estilos de usuario y logout */
+        .user-info {
+            width: 100%;
+            text-align: center;
+            padding: 15px;
+            border-top: 1px solid #475a6e;
+            margin-top: auto; /* Empuja el bloque hacia abajo */
+        }
+
+        .user-info small {
+            color: #bdc3c7;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .user-info .btn-danger {
+            width: 100%;
+            margin-top: 5px;
+        }
+        
+        /* Botón de Resúmenes Diarios y Reporte Mensual agrupados en el orden correcto */
+        .summary-group {
+            border: none; /* Eliminar el estilo de list-unstyled */
+            padding: 0;
+        }
+        .summary-group .nav-link {
+            padding-left: 30px !important; /* Pequeña indentación para los sub-elementos si fuera necesario, aunque los mantendremos iguales */
+            background: #3a536b; /* Un poco diferente */
+        }
+    </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">🚗 Trip Counter</div>
-    <div class="user">
-      {% if session.get('email') %}
-        <span class="email">{{ session.get('email') }}</span>
-        <a href="{{ url_for('logout') }}" class="btn small">Cerrar sesión</a>
-      {% else %}
-        <a href="{{ url_for('login') }}" class="btn small">Iniciar sesión</a>
-      {% endif %}
-    </div>
-  </header>
+    <div class="wrapper">
+        <!-- Sidebar (Barra de navegación vertical) -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <!-- 1. Logo (Asume que logo.png está en la carpeta 'static/assets/') -->
+                <!-- NOTA IMPORTANTE: Si la carpeta 'assets' NO existe, cambiar 'assets/logo.png' por 'logo.png' -->
+                <img src="{{ url_for('static', filename='assets/logo.png') }}" alt="Trip Counter Logo" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo.png') }}';">
+                
+                <!-- 2. Título Centrado y Grande -->
+                <h3>Trip Counter</h3>
+            </div>
+            
+            <ul class="list-unstyled components">
+                <!-- 3. Botones de Navegación en el orden solicitado -->
+                
+                <!-- Inicio -->
+                <li><a class="nav-link" href="{{ url_for('home_page') }}">Inicio</a></li>
+                
+                <!-- Kilometraje -->
+                <li><a class="nav-link" href="{{ url_for('kilometraje_page') }}">Kilometraje</a></li>
+                
+                <!-- Registrar Viajes -->
+                <li><a class="nav-link" href="{{ url_for('viajes_page') }}">Registrar Viajes</a></li>
+                
+                <!-- Registrar Gastos -->
+                <li><a class="nav-link" href="{{ url_for('gastos_page') }}">Registrar Gastos</a></li>
+                
+                <!-- Viajes Extras -->
+                <li><a class="nav-link" href="{{ url_for('extras_page') }}">Viajes Extras</a></li>
+                
+                <!-- Presupuesto -->
+                <li><a class="nav-link" href="{{ url_for('presupuesto_page') }}">Presupuesto</a></li>
 
-  {% if session.get('email') %}
-  <nav class="main-nav-buttons">
-    <div class="nav-button-container">
-        <a href="{{ url_for('index') }}" class="nav-btn btn-home">Inicio</a>
-        <a href="{{ url_for('viajes_page') }}" class="nav-btn btn-viajes">Registrar Viajes</a>
-        <a href="{{ url_for('extras_page') }}" class="nav-btn btn-extras">Viajes Extra</a>
-        <a href="{{ url_for('gastos_page') }}" class="nav-btn btn-gastos">Registrar Gastos</a>
-        <a href="{{ url_for('presupuesto_page') }}" class="nav-btn btn-presupuesto">Presupuesto</a>
-        <a href="{{ url_for('kilometraje_page') }}" class="nav-btn btn-kilometraje">Kilometraje</a> 
-        
-        <a href="{{ url_for('summary_page') }}" class="nav-btn btn-resumenes">Resúmenes Diarios</a>
-        
-        <a href="{{ url_for('monthly_report_page') }}" class="nav-btn btn-reportes">Reporte Mensual</a>
-        
-    </div>
-  </nav>
-  {% endif %}
-  <main class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-messages">
-          {% for category, message in messages %}
-            <div class="message-box {{ category }}">{{ message }}</div> 
-          {% endfor %}
+                <!-- Resumen Diario -->
+                <li><a class="nav-link" href="{{ url_for('resumen_page') }}">Resumen Diario</a></li>
+
+                <!-- Reporte Mensual -->
+                <li><a class="nav-link" href="{{ url_for('report_page') }}">Reporte Mensual</a></li>
+                
+            </ul>
+            
+            <!-- Información de Usuario -->
+            <div class="user-info">
+                {% if session.get('email') %}
+                    <small>Usuario: {{ session.get('email') }}</small>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Cerrar sesión</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Iniciar sesión</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- Contenido de la Página (El bloque 'content') -->
+        <div id="content">
+            {% block content %}{% endblock %}
         </div>
-      {% endif %}
-    {% endwith %}
+    </div>
 
-    {% block content %}{% endblock %}
-  </main>
-
-  <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <!-- Scripts de Bootstrap y scripts.js -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
 </body>
 </html>
