@@ -82,6 +82,43 @@ SUMMARIES_SHEET_ID = os.environ.get("SUMMARIES_SHEET_ID")
 
 
 # ----------------------------
+# CACHE DE DATOS (CRÍTICO PARA RESOLVER EL ERROR 429)
+# ----------------------------
+CACHE = {}
+CACHE_TTL = 5  # Tiempo de vida del caché en segundos
+
+def get_all_records_cached(ws, ws_name):
+    """
+    Retorna todos los registros de la hoja, usando caché si los datos
+    no han expirado (TTL). Solo aplica a operaciones GET.
+    """
+    now = time.time()
+    cache_key = ws_name
+    
+    # 1. Intentar servir desde caché
+    if cache_key in CACHE and now < CACHE[cache_key]['expires']:
+        # app.logger.info(f"Serving {ws_name} from cache.")
+        return CACHE[cache_key]['data']
+
+    # 2. Leer de Google Sheets (consume cuota)
+    # app.logger.info(f"Reading {ws_name} from Google Sheets.")
+    try:
+        data = ws.get_all_records()
+        
+        # 3. Guardar en caché
+        CACHE[cache_key] = {
+            'data': data,
+            'expires': now + CACHE_TTL
+        }
+        return data
+    except Exception as e:
+        app.logger.error(f"Error reading {ws_name} from Sheets: {e}")
+        # Si falla leer de sheets, devuelve lo que sea que esté en caché si existe, o levanta el error.
+        if cache_key in CACHE:
+             return CACHE[cache_key]['data']
+        raise
+
+# ----------------------------
 # Debug inicial visible en Render logs
 # ----------------------------
 @app.before_request
@@ -201,7 +238,7 @@ def ensure_sheet_with_headers(client, ws_name, headers, max_retries=3):
         app.logger.error(f"Error al obtener la pestaña de {WORKBOOK_NAME}: {e}")
         raise
         
-    # 3. Asegurar que las Cabeceras son correctas
+    # 3. Asegurar que las Cabeceras son correctas (Esta operación es una lectura y NO se cachea)
     try:
         current_headers = ws.row_values(1)
         if current_headers != headers:
@@ -260,7 +297,8 @@ def update_daily_bonus_sheet(client, fecha, total_bonus):
     """Guarda o actualiza el bono diario total en la hoja 'TripCounter_Bonuses'."""
     ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
     
-    records = ws_bonuses.get_all_records()
+    # Usamos la versión no-cached para operaciones que escriben/actualizan
+    records = ws_bonuses.get_all_records() 
     found = False
     
     for i, r in enumerate(records):
@@ -275,6 +313,9 @@ def update_daily_bonus_sheet(client, fecha, total_bonus):
         new_row = [fecha, total_bonus]
         ws_bonuses.append_row(new_row)
         
+    # CRÍTICO: Invalidar la caché después de una escritura
+    CACHE.pop(BONUS_WS_NAME, None)
+    
     return total_bonus
 
 def calculate_daily_summary(client, target_date):
@@ -282,33 +323,33 @@ def calculate_daily_summary(client, target_date):
     Calcula los totales de Ingresos, Egresos y Kilometraje para una fecha dada.
     target_date debe ser un string en formato YYYY-MM-DD.
     """
-    # 1. Obtener datos de Viajes e Ingresos (Trips)
+    # 1. Obtener datos de Viajes e Ingresos (Trips) - USANDO CACHE
     ws_trips = ensure_sheet_with_headers(client, TRIPS_WS_NAME, TRIPS_HEADERS)
-    trips_records = ws_trips.get_all_records()
+    trips_records = get_all_records_cached(ws_trips, TRIPS_WS_NAME)
     trips_today = [r for r in trips_records if str(r.get("Fecha")) == str(target_date)]
     
     total_gross_income = sum(float(r.get("Total", 0)) for r in trips_today)
     num_trips = len(trips_today)
 
-    # 2. Obtener datos de Gastos
+    # 2. Obtener datos de Gastos - USANDO CACHE
     ws_gastos = ensure_sheet_with_headers(client, GASTOS_WS_NAME, GASTOS_HEADERS)
-    gastos_records = ws_gastos.get_all_records()
+    gastos_records = get_all_records_cached(ws_gastos, GASTOS_WS_NAME)
     gastos_today = [r for r in gastos_records if str(r.get("Fecha")) == str(target_date)]
     
     total_expenses = sum(float(r.get("Monto", 0)) for r in gastos_today)
 
-    # 3. Obtener datos de Kilometraje
+    # 3. Obtener datos de Kilometraje - USANDO CACHE
     ws_km = ensure_sheet_with_headers(client, KM_WS_NAME, KM_HEADERS)
-    km_records = ws_km.get_all_records()
+    km_records = get_all_records_cached(ws_km, KM_WS_NAME)
     km_record = next((r for r in km_records if str(r.get("Fecha")) == str(target_date)), None)
     
     total_km_recorrido = int(km_record.get("Recorrido", 0)) if km_record and km_record.get("Recorrido") else 0
 
     # 4. Calcular el Ingreso Neto y la Productividad
     
-    # Bono del día
+    # Bono del día - USANDO CACHE
     ws_bonuses = ensure_sheet_with_headers(client, BONUS_WS_NAME, BONUS_HEADERS)
-    bonus_records = ws_bonuses.get_all_records()
+    bonus_records = get_all_records_cached(ws_bonuses, BONUS_WS_NAME)
     current_bonus = next((float(r.get('Bono total', 0.0)) for r in bonus_records if str(r.get("Fecha")) == str(target_date)), 0.0)
 
     # Ingreso total (Viajes + Bono)
@@ -367,15 +408,14 @@ def oauth2callback():
         email_to_check = session.get('email')
         is_new_user = False
         
-        try:
-            ws_pres.find(email_to_check)
-        except gspread.exceptions.CellNotFound:
-            is_new_user = True
-        except Exception as e:
-            app.logger.error(f"Error al verificar existencia de usuario: {e}")
-            is_new_user = False 
-
+        # Leemos sin caché para asegurar que no nos falle el POST inicial si no hay datos
+        records = ws_pres.get_all_records()
+        if not any(r.get("alias") == email_to_check for r in records):
+             is_new_user = True
+        
+        # Si el usuario es nuevo, invalidamos la caché de presupuesto inmediatamente antes de redirigir.
         if is_new_user:
+            CACHE.pop(PRESUPUESTO_WS_NAME, None)
             app.logger.info(f"Nuevo usuario {email_to_check} detectado. Redirigiendo a Presupuesto.")
             flash('¡Bienvenido/a! Por favor, agrega tus primeros ítems de presupuesto para empezar.', 'success')
             return redirect(url_for("presupuesto_page"))
@@ -412,7 +452,8 @@ def index():
         # B. Intentar cargar los recordatorios
         try:
             ws_pres = ensure_sheet_with_headers(client, PRESUPUESTO_WS_NAME, PRESUPUESTO_HEADERS)
-            records = ws_pres.get_all_records()
+            # USANDO CACHE
+            records = get_all_records_cached(ws_pres, PRESUPUESTO_WS_NAME)
             
             today = date.today()
             
@@ -575,10 +616,10 @@ def api_trips():
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
         
-        all_trips = ws_trips.get_all_records()
+        all_trips = get_all_records_cached(ws_trips, TRIPS_WS_NAME)
         filtered_trips = [r for r in all_trips if str(r.get("Fecha")) == str(qdate)]
         
-        all_bonuses = ws_bonuses.get_all_records()
+        all_bonuses = get_all_records_cached(ws_bonuses, BONUS_WS_NAME)
         current_bonus = next((float(r.get('Bono total', 0.0)) for r in all_bonuses if str(r.get("Fecha")) == str(qdate)), 0.0)
         
         return jsonify({"trips": filtered_trips, "bonus": current_bonus})
@@ -604,6 +645,7 @@ def api_trips():
     aeropuerto_val = AIRPORT_FEE if aeropuerto_flag else 0.0 
     total = round(monto + propina + aeropuerto_val, 2)
 
+    # Obtenemos los viajes sin cachear para el POST
     all_trips = ws_trips.get_all_records()
 
     for r in all_trips:
@@ -618,11 +660,16 @@ def api_trips():
         ws_trips.append_row(row)
         app.logger.info(f"New trip appended: {row}")
         
+        # Invalida la caché de TRIPS después de la escritura
+        CACHE.pop(TRIPS_WS_NAME, None) 
+        
+        # Volvemos a leer sin cachear para calcular el bono correctamente
         all_trips_after_post = ws_trips.get_all_records()
         trips_today = [r for r in all_trips_after_post if str(r.get("Fecha")) == str(fecha)]
         
         current_bonus = calculate_current_bonus(trips_today)
-        update_daily_bonus_sheet(client, fecha, current_bonus)
+        update_daily_bonus_sheet(client, fecha, current_bonus) # Ya invalida la caché de BONUS
+        
     except Exception as e:
         app.logger.error(f"Error al registrar viaje o actualizar bono: {e}")
         return jsonify({"error": "Error interno al interactuar con Sheets."}), 500
@@ -651,7 +698,7 @@ def api_expenses():
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
         
-        all_expenses = ws_gastos.get_all_records()
+        all_expenses = get_all_records_cached(ws_gastos, GASTOS_WS_NAME)
         filtered_expenses = [r for r in all_expenses if str(r.get("Fecha")) == str(qdate)]
         
         return jsonify(filtered_expenses)
@@ -674,6 +721,10 @@ def api_expenses():
         row = [fecha, hora, monto, categoria, descripcion]
         ws_gastos.append_row(row)
         app.logger.info(f"New expense appended: {row}")
+        
+        # Invalida la caché de GASTOS después de la escritura
+        CACHE.pop(GASTOS_WS_NAME, None) 
+        
     except Exception as e:
         app.logger.error(f"Error al registrar gasto: {e}")
         return jsonify({"error": "Error interno al interactuar con Sheets."}), 500
@@ -690,7 +741,6 @@ def api_extras():
         return jsonify({"error":"not_authenticated"}), 401
     try:
         client = get_gspread_client()
-        # Aquí se usa el EXTRAS_SHEET_ID que ya confirmaste haber agregado en Render.
         ws = ensure_sheet_with_headers(client, EXTRAS_WS_NAME, EXTRAS_HEADERS)
     except Exception as e:
         # Si la conexión falla ahora, es por un error de permisos o un problema con el ID, no por falta de la variable.
@@ -699,7 +749,7 @@ def api_extras():
 
     if request.method == "GET":
         qdate = request.args.get("date") or date.today().isoformat()
-        records = ws.get_all_records()
+        records = get_all_records_cached(ws, EXTRAS_WS_NAME)
         filtered = [r for r in records if str(r.get("Fecha")) == str(qdate)]
         return jsonify(filtered)
 
@@ -712,7 +762,9 @@ def api_extras():
     except Exception:
         monto = 0.0
 
+    # Obtenemos los registros sin cachear para la comprobación de duplicados
     records = ws.get_all_records()
+    
     for r in records:
         if str(r.get("Fecha")) == str(fecha) and str(r.get("Hora inicio")) == hi and str(r.get("Hora fin")) == hf:
             return jsonify({"error":"duplicate"}), 409
@@ -725,6 +777,10 @@ def api_extras():
         row = [fecha, numero, hi, hf, monto, total]
         ws.append_row(row)
         app.logger.info(f"New extra appended: {row}")
+        
+        # Invalida la caché de EXTRAS después de la escritura
+        CACHE.pop(EXTRAS_WS_NAME, None) 
+        
     except Exception as e:
         app.logger.error(f"Error al registrar extra: {e}")
         return jsonify({"error": "Error interno al interactuar con Sheets."}), 500
@@ -748,7 +804,8 @@ def api_presupuesto():
 
 
     if request.method == "GET":
-        records = ws.get_all_records()
+        # USANDO CACHE para la lista de presupuestos
+        records = get_all_records_cached(ws, PRESUPUESTO_WS_NAME)
         return jsonify(records)
 
     if request.method == "POST":
@@ -779,6 +836,10 @@ def api_presupuesto():
         try:
             row = [alias, categoria, monto, tipo_gasto, fecha_pago, "False"]
             ws.append_row(row)
+            
+            # Invalida la caché de PRESUPUESTO después de la escritura
+            CACHE.pop(PRESUPUESTO_WS_NAME, None) 
+            
         except Exception as e:
             app.logger.error(f"Error al registrar presupuesto: {e}")
             return jsonify({"error": "Error interno al interactuar con Sheets."}), 500
@@ -793,6 +854,10 @@ def api_presupuesto():
         try:
             # Marcar como pagado
             ws.update_cell(int(row_index), PRESUPUESTO_HEADERS.index("pagado") + 1, "True")
+            
+            # Invalida la caché de PRESUPUESTO después de la escritura
+            CACHE.pop(PRESUPUESTO_WS_NAME, None) 
+            
             return jsonify({"status":"ok"}), 200
         except Exception as e:
             app.logger.error(f"Error actualizando celda en GSheets: {e}")
@@ -813,6 +878,10 @@ def api_presupuesto():
                  
             # Eliminación de la fila en Google Sheets
             ws.delete_rows(row_index)
+            
+            # Invalida la caché de PRESUPUESTO después de la escritura
+            CACHE.pop(PRESUPUESTO_WS_NAME, None) 
+            
             return jsonify({"status":"ok", "message": f"Fila {row_index} eliminada."}), 200
             
         except Exception as e:
@@ -839,7 +908,8 @@ def api_kilometraje():
         return jsonify({"error": f"Error de conexión a la base de datos: {e}"}), 500
         
     qdate = request.args.get("date") or date.today().isoformat()
-    all_records = ws.get_all_records()
+    # Leemos sin caché para operaciones que pueden ser de escritura/actualización
+    all_records = ws.get_all_records() 
     
     existing_record_index = -1
     for i, r in enumerate(all_records):
@@ -849,8 +919,12 @@ def api_kilometraje():
 
     # --- Lógica GET (Visualizar) ---
     if request.method == "GET":
-        if existing_record_index > 0:
-            return jsonify(all_records[existing_record_index - 2]) 
+        # Usamos caché para la lectura si no hay operaciones de escritura pendientes
+        all_records_cached = get_all_records_cached(ws, KM_WS_NAME)
+        km_record = next((r for r in all_records_cached if str(r.get("Fecha")) == str(qdate)), None)
+        
+        if km_record:
+            return jsonify(km_record) 
         else:
             return jsonify({"status": "no_record", "message": "No hay registro de kilometraje para este día."}), 200
 
@@ -873,6 +947,10 @@ def api_kilometraje():
             
             row = [qdate, km_value, "", "", notes] 
             ws.append_row(row)
+            
+            # Invalida la caché de KM después de la escritura
+            CACHE.pop(KM_WS_NAME, None) 
+            
             return jsonify({"status": "start_recorded", "km_inicio": km_value}), 201
 
         elif action == 'end':
@@ -894,6 +972,9 @@ def api_kilometraje():
             ws.update_cell(existing_record_index, KM_FIN_COL, km_fin)
             ws.update_cell(existing_record_index, RECORRIDO_COL, recorrido)
             
+            # Invalida la caché de KM después de la actualización
+            CACHE.pop(KM_WS_NAME, None) 
+            
             return jsonify({"status": "end_recorded", "km_fin": km_fin, "recorrido": recorrido}), 200
 
         else:
@@ -904,7 +985,7 @@ def api_kilometraje():
 
 
 # ----------------------------
-# API: Resumen Mensual (Se deja el nombre de la función y la ruta original)
+# API: Resumen Diario
 # ----------------------------
 @app.route("/api/summary", methods=["GET"])
 def api_summary():
@@ -918,14 +999,19 @@ def api_summary():
     
     try:
         client = get_gspread_client()
+        # calculate_daily_summary usa caching internamente
         summary_data = calculate_daily_summary(client, target_date)
         return jsonify(summary_data)
     except Exception as e:
         app.logger.error(f"Error generando resumen: {e}")
+        # Si el error es una cuota excedida, retornamos un error 503 (Service Unavailable)
+        if "Quota exceeded" in str(e):
+            return jsonify({"error": "quota_exceeded", "message": "El servidor está experimentando alta demanda de datos. Por favor, inténtalo de nuevo en un momento."}), 503
+            
         return jsonify({"error": "Error interno al calcular el resumen."}), 500
 
 # ----------------------------
-# API: Reporte Mensual (Se deja la ruta API original)
+# API: Reporte Mensual
 # ----------------------------
 @app.route("/api/monthly_report", methods=["GET"])
 def api_monthly_report():
@@ -978,6 +1064,9 @@ def api_monthly_report():
     current_date = start_date
     daily_data = [] 
     
+    # CUIDADO CRÍTICO: El cálculo diario usa caché, lo cual ayuda a mitigar las llamadas excesivas 
+    # en la generación del reporte mensual (que llama a calculate_daily_summary N veces).
+    
     while current_date <= end_date:
         date_str = current_date.isoformat()
         try:
@@ -994,6 +1083,8 @@ def api_monthly_report():
 
         except Exception as e:
             app.logger.warning(f"Error procesando el día {date_str}: {e}")
+            if "Quota exceeded" in str(e):
+                return jsonify({"error": "quota_exceeded", "message": "El servidor está experimentando alta demanda de datos. Por favor, inténtalo de nuevo en un momento."}), 503
             pass
             
         current_date += timedelta(days=1)
@@ -1007,11 +1098,12 @@ def api_monthly_report():
     
     monthly_summary["productivity_per_km"] = round(productivity_per_km, 2)
     
-    # 4. Guardar en TripCounter_Summaries (Histórico)
+    # 4. Guardar en TripCounter_Summaries (Histórico) - Sin cachear la lectura/escritura
     try:
         ws_summaries = ensure_sheet_with_headers(client, SUMMARIES_WS_NAME, SUMMARIES_HEADERS)
         summary_date_str = start_date.isoformat()
         
+        # Leemos sin caché para la lógica de actualización
         records = ws_summaries.get_all_records()
         
         existing_row_index = -1
@@ -1039,6 +1131,9 @@ def api_monthly_report():
         else:
             ws_summaries.append_row(row_data)
             app.logger.info(f"Reporte mensual guardado para {month}/{year}")
+            
+        # Invalida la caché de SUMMARIES
+        CACHE.pop(SUMMARIES_WS_NAME, None) 
 
     except Exception as e:
         app.logger.error(f"Error al guardar el resumen en Sheets: {e}")
@@ -1056,3 +1151,4 @@ if __name__ == "__main__":
     print("DEBUG: Flask app ejecutándose directamente")
     # Para ejecutar localmente, descomentar la siguiente línea
     # app.run(host="0.0.0.0", port=10000, debug=True)
+
