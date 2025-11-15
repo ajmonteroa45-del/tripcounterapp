@@ -7,13 +7,18 @@
     <h2>Panel principal</h2>
     <p>Bienvenido, <strong>{{ email }}</strong>. Elige una sección:</p>
 
-    <nav class="nav-links mb-4">
-        <a href="{{ url_for('viajes_page') }}" class="btn btn-primary">Registrar viajes</a>
-        <a href="{{ url_for('extras_page') }}" class="btn btn-warning">Viajes extra</a>
-        <a href="{{ url_for('gastos_page') }}" class="btn btn-danger">Registrar gastos</a> <a href="{{ url_for('presupuesto_page') }}" class="btn btn-success">Presupuesto</a>
-        <a href="{{ url_for('api_monthly_report') }}" class="btn btn-info">Resúmenes</a>
-    </nav>
-    <hr>
+    <p>Bienvenido, <strong>{{ email }}</strong>. Elige una sección:</p>
+
+<nav class="nav-links mb-4">
+    <div class="list-group list-group-horizontal text-center">
+        <a href="{{ url_for('viajes_page') }}" class="list-group-item list-group-item-action list-group-item-primary">Registrar viajes</a>
+        <a href="{{ url_for('extras_page') }}" class="list-group-item list-group-item-action list-group-item-warning">Viajes extra</a>
+        <a href="{{ url_for('gastos_page') }}" class="list-group-item list-group-item-action list-group-item-danger">Registrar gastos</a>
+        <a href="{{ url_for('presupuesto_page') }}" class="list-group-item list-group-item-action list-group-item-success">Presupuesto</a>
+        <a href="{{ url_for('api_monthly_report') }}" class="list-group-item list-group-item-action list-group-item-info">Resúmenes</a>
+    </div>
+</nav>
+<hr>
 
     {% if reminders %}
       <section class="card reminders-section p-4 mt-4">
