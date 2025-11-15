@@ -519,22 +519,19 @@ def presupuesto_page():
         return redirect(url_for("login"))
     return render_template("presupuesto.html", email=session.get('email'))
 
-# RUTA NUEVA: Para la UI de Reporte Mensual (Solución al error de navegación)
+# RUTA CORREGIDA: Resumen Diario (UI)
 @app.route("/resumenes")
-def reports_page():
+def summary_page():
     if not session.get('email'):
         return redirect(url_for("login"))
     
-    # Obtener el mes y año actual como valores predeterminados
-    today = date.today()
-    default_month = today.month
-    default_year = today.year
+    today_date = date.today().isoformat()
     
-    return render_template("reports.html", 
+    # Renderizamos la plantilla que contiene el selector de fecha para el resumen diario
+    return render_template("summary.html", 
                            email=session.get('email'),
-                           default_month=default_month,
-                           default_year=default_year)
-# FIN DE RUTA NUEVA
+                           today_date=today_date)
+# FIN DE RUTA CORREGIDA
 
 # ----------------------------
 # API: Trips (Ruta Unificada)
@@ -889,7 +886,7 @@ def api_kilometraje():
 
 
 # ----------------------------
-# API: Resumen Mensual
+# API: Resumen Mensual (Se deja el nombre de la función y la ruta original)
 # ----------------------------
 @app.route("/api/summary", methods=["GET"])
 def api_summary():
@@ -910,7 +907,7 @@ def api_summary():
         return jsonify({"error": "Error interno al calcular el resumen."}), 500
 
 # ----------------------------
-# API: Reporte Mensual
+# API: Reporte Mensual (Se deja la ruta API original)
 # ----------------------------
 @app.route("/api/monthly_report", methods=["GET"])
 def api_monthly_report():
