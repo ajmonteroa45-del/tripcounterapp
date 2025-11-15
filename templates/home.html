@@ -1,35 +1,43 @@
 {% extends "base.html" %}
+
+{% block title %}Panel Principal{% endblock %}
+
 {% block content %}
-  <h2>Panel principal</h2>
-  <p>Bienvenido, <strong>{{ email }}</strong>. Elige una sección:</p>
+  <div class="container mt-4">
+    <h2>Panel principal</h2>
+    <p>Bienvenido, <strong>{{ email }}</strong>. Elige una sección:</p>
 
-  <nav class="nav-links">
-    <a href="{{ url_for('viajes_page') }}">Registrar viajes</a>
-    <a href="{{ url_for('extras_page') }}">Viajes extra</a>
-    <a href="{{ url_for('presupuesto_page') }}">Presupuesto</a>
-    <a href="{{ url_for('index') }}">Resúmenes</a>
-  </nav>
+    <nav class="nav-links mb-4">
+        <a href="{{ url_for('viajes_page') }}" class="btn btn-primary">Registrar viajes</a>
+        <a href="{{ url_for('extras_page') }}" class="btn btn-warning">Viajes extra</a>
+        <a href="{{ url_for('gastos_page') }}" class="btn btn-danger">Registrar gastos</a> <a href="{{ url_for('presupuesto_page') }}" class="btn btn-success">Presupuesto</a>
+        <a href="{{ url_for('api_monthly_report') }}" class="btn btn-info">Resúmenes</a>
+    </nav>
+    <hr>
 
-  {% if reminders %}
-    <section class="card reminders-section">
-      <h3>⚠️ Recordatorios</h3>
-      <ul>
-        {% for r in reminders %}
-          <li>
-            {% if r.type == '3days' %}En 3 días: {% elif r.type == 'due' %}Hoy vence: {% endif %}
-            
-            <strong>{{ r.categoria }}</strong> — S/ {{ "{:,.2f}".format(r.monto) }}
-            
-            <button 
-                class="mark-paid-btn" 
-                data-row-index="{{ r.row_index }}"
-                data-category="{{ r.categoria }}"
-            >
-                Marcar como pagado
-            </button>
-          </li>
-        {% endfor %}
-      </ul>
-    </section>
-  {% endif %}
+    {% if reminders %}
+      <section class="card reminders-section p-4 mt-4">
+        <h3>⚠️ Recordatorios</h3>
+        <ul class="list-group list-group-flush">
+          {% for r in reminders %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                {% if r.type == '3days' %}En 3 días: {% elif r.type == 'due' %}Hoy vence: {% endif %}
+                
+                <strong>{{ r.categoria }}</strong> — S/ {{ "{:,.2f}".format(r.monto) }}
+              </div>
+              
+              <button 
+                  class="btn btn-sm btn-outline-secondary mark-paid-btn" 
+                  data-row-index="{{ r.row_index }}"
+                  data-category="{{ r.categoria }}"
+              >
+                  Marcar como pagado
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </div>
 {% endblock %}
