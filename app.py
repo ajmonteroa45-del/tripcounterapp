@@ -506,6 +506,19 @@ def gastos_page():
                            today_date=today_date,
                            now=now)
 
+# RUTA NUEVA: Para registrar Kilometraje
+@app.route("/kilometraje")
+def kilometraje_page():
+    if not session.get('email'):
+        return redirect(url_for("login"))
+    
+    today_date = date.today().isoformat()
+    
+    return render_template("kilometraje.html", 
+                           email=session.get('email'),
+                           today_date=today_date)
+# FIN DE RUTA NUEVA
+
 @app.route("/presupuesto")
 def presupuesto_page():
     if not session.get('email'):
