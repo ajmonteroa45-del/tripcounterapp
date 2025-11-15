@@ -8,6 +8,10 @@
   --success-text: #065f46;
   --error-bg: #fee2e2;
   --error-text: #991b1b;
+  /* Nuevas variables para la tabla */
+  --table-header-bg: #28a745; /* Verde fuerte para la cabecera (similar a la imagen) */
+  --table-row-odd: #ffffff;   /* Blanco para filas impares */
+  --table-row-even: #f0f8ff;  /* Azul muy claro para filas pares */
 }
 
 body{
@@ -58,12 +62,54 @@ body{
 .btn.small{ padding:6px 10px; font-size:13px; }
 
 /* ---------------------------------------------------------------------- */
+/* --- ESTILOS DE TABLA (SUMMARY-TABLE) --- */
+/* ---------------------------------------------------------------------- */
+
+/* Estilo base para las tablas de resumen */
+.summary-table {
+    width: 100%;
+    border-collapse: collapse; /* Elimina doble borde */
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.summary-table thead th {
+    background-color: var(--table-header-bg); /* Fondo de cabecera verde */
+    color: white;
+    padding: 10px 8px; /* Más espaciado en cabecera */
+    text-align: left;
+    border: none;
+}
+
+.summary-table tbody tr {
+    /* Fondo para filas impares */
+    background-color: var(--table-row-odd); 
+    border-bottom: 1px solid #e5e7eb; /* Separador sutil */
+}
+
+/* Rayas de cebra: Fondo para filas pares */
+.summary-table tbody tr:nth-child(even) {
+    background-color: var(--table-row-even); 
+}
+
+.summary-table td {
+    padding: 8px 8px; /* Espaciado interno de celdas */
+    vertical-align: middle;
+    border: none;
+}
+
+/* Colores específicos para totales dentro de las tablas */
+.summary-table td strong {
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------- */
 /* --- NUEVOS ESTILOS PARA LA BARRA DE NAVEGACIÓN GLOBAL (MAIN-NAV) --- */
 /* ---------------------------------------------------------------------- */
 
 .main-nav-buttons {
     padding: 10px 16px; /* Padding ajustado para coincidir con el layout */
-    background-color: #f8f9fa; /* Fondo ligero para la barra */
+    background-color: var(--card); /* Fondo ligero para la barra */
     border-bottom: 1px solid #dee2e6;
 }
 
@@ -78,7 +124,7 @@ body{
 
 .nav-btn {
     /* Estilos generales que simulan el botón que deseas */
-    display: block; /* Ocupa todo el ancho disponible en el flex item */
+    display: block; 
     padding: 8px 12px;
     border-radius: 6px;
     text-decoration: none;
@@ -86,10 +132,9 @@ body{
     font-weight: 600;
     text-align: center;
     transition: background-color 0.2s, opacity 0.2s;
-    flex-grow: 1; /* Permite que los botones crezcan ligeramente para llenar la fila */
-    flex-basis: auto; /* Permite que el navegador decida el tamaño base */
-    min-width: 120px; /* Ancho mínimo para legibilidad */
-    /* Aseguramos que el texto no se corte */
+    flex-grow: 1; 
+    flex-basis: auto; 
+    min-width: 120px; 
     white-space: nowrap; 
 }
 
@@ -108,7 +153,7 @@ body{
 
 .btn-extras {
     background-color: #ffc107; /* Amarillo/Advertencia */
-    color: #343a40; /* Texto oscuro para fondo claro */
+    color: var(--text); /* Texto oscuro para fondo claro */
 }
 
 .btn-gastos {
