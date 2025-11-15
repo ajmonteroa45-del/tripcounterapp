@@ -593,7 +593,7 @@ function initializeKilometrajePage() {
 
 
 // =========================================================
-// LÓGICA DE PRESUPUESTO (CORRECCIÓN CRÍTICA Y BOTONES)
+// LÓGICA DE PRESUPUESTO (CORRECCIÓN FINAL DE NULL CHECK)
 // =========================================================
 
 function initializeBudgetPage() {
@@ -604,25 +604,26 @@ function initializeBudgetPage() {
 
     // --- Validación de elementos críticos ---
     if (!budgetForm || !budgetListContainer || !budgetMessageDiv) {
-        console.error("Error: Elementos principales del Presupuesto no encontrados.");
         return;
     }
     
-    // --- Lógica Fijo/Variable ---
+    // --- Lógica Fijo/Variable (Los elementos que causan el error) ---
     const fijoRadio = document.getElementById('gasto_fijo');
     const variableRadio = document.getElementById('gasto_variable');
     const fechaContainer = document.getElementById('fecha-pago-container');
     const fechaInput = document.getElementById('fecha_pago');
     
-    // CORRECCIÓN CLAVE: Se asegura que los elementos existan
+    // CORRECCIÓN FINAL: Solo si *todos* los elementos condicionales existen, adjuntamos listeners y definimos toggleFechaInput.
     if (fijoRadio && variableRadio && fechaContainer && fechaInput) { 
         function toggleFechaInput() {
             if (fijoRadio.checked) {
                 fechaContainer.style.display = 'block';
-                fechaInput.setAttribute('required', 'required');
+                // Chequeo de existencia para manipulación de atributos
+                if (fechaInput) fechaInput.setAttribute('required', 'required'); 
             } else {
                 fechaContainer.style.display = 'none';
-                fechaInput.removeAttribute('required');
+                 // Chequeo de existencia para manipulación de atributos
+                if (fechaInput) fechaInput.removeAttribute('required'); 
             }
         }
         
@@ -667,7 +668,6 @@ function initializeBudgetPage() {
                         <td>
                             ${isPaid ? 
                                 `<span class="text-success me-2">Pagado</span>` : 
-                                // CORRECCIÓN: Usar la clase mark-paid-btn definida en CSS/Home.
                                 `<button class="mark-paid-btn me-2" data-row-index="${rowIndex}">Marcar</button>`
                             }
                             <button class="btn btn-sm btn-danger delete-btn" data-row-index="${rowIndex}">
@@ -684,16 +684,17 @@ function initializeBudgetPage() {
         }
     }
 
+
     // 2. Manejo del Formulario (POST: Crear nuevo presupuesto)
     budgetForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         budgetMessageDiv.innerHTML = 'Procesando...';
         budgetMessageDiv.className = '';
 
-        // Aseguramos que los radios existan antes de acceder a ellos
         const tipoGasto = document.querySelector('input[name="tipo_gasto"]:checked') ? document.querySelector('input[name="tipo_gasto"]:checked').value : 'N/A';
         let fechaPago = '';
 
+        // Solo accedemos a fechaInput si sabemos que existe para gastos Fijos
         if (tipoGasto === 'Fijo' && fechaInput) {
             fechaPago = fechaInput.value;
             if (!fechaPago) {
@@ -724,8 +725,9 @@ function initializeBudgetPage() {
                 budgetMessageDiv.innerHTML = '✅ ¡Presupuesto añadido con éxito!';
                 budgetMessageDiv.className = 'message-box alert alert-success';
                 budgetForm.reset(); 
-                if (fijoRadio) fijoRadio.checked = true; // Reiniciar Fijo/Variable
-                if (fechaInput) toggleFechaInput(); // Aplicar la visibilidad
+                if (fijoRadio) fijoRadio.checked = true;
+                // Si la función toggleFechaInput fue definida, la llamamos.
+                if (fijoRadio && typeof toggleFechaInput === 'function') toggleFechaInput(); 
                 loadBudgets(); 
             } else {
                 const msg = result.message || result.error || 'Error al añadir presupuesto.';
@@ -741,7 +743,7 @@ function initializeBudgetPage() {
 
     // 4. Asignar Event Listeners para PUT (Marcar Pagado) y DELETE (Eliminar)
     if (budgetListContainer) {
-        budgetListContainer.addEventListener('click', async (event) => {
+         budgetListContainer.addEventListener('click', async (event) => {
             const target = event.target;
             const rowIndex = target.dataset.rowIndex;
             if (!rowIndex) return;
@@ -922,9 +924,6 @@ function initializeSummaryPage() {
 
     // Carga inicial al iniciar la página
     fetchAndDisplaySummary(fechaInput.value);
-    
-    // El listener de cambio de fecha ya está adjunto en la sección global del DOMContentLoaded
-    // porque 'fechaSummaryInput' (que es summary_fecha) existe.
 }
 
 
@@ -936,7 +935,7 @@ function initializeReportPage() {
     const reportForm = document.getElementById('reportForm');
     const reportResultsDiv = document.getElementById('report-results');
     
-    // Esta función se llama si reportForm existe (que estará en reports.html, si lo creas)
+    // Esta función se llama si reportForm existe (usado para reportes mensuales si creas la UI)
     if (!reportForm || !reportResultsDiv) return;
 
     reportForm.addEventListener('submit', async function(e) {
