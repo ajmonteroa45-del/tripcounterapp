@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Reporte Mensual{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📊 Generar Reporte Mensual</h2>
+
+    <section class="card p-4 shadow-sm mb-4">
+        <h3>Seleccionar Periodo</h3>
+        <form id="reportForm">
+            <div class="form-group mb-3">
+                <label for="month">Mes:</label>
+                <select id="month" name="month" class="form-control" required>
+                    <option value="1" {% if default_month == 1 %}selected{% endif %}>Enero</option>
+                    <option value="2" {% if default_month == 2 %}selected{% endif %}>Febrero</option>
+                    <option value="3" {% if default_month == 3 %}selected{% endif %}>Marzo</option>
+                    <option value="4" {% if default_month == 4 %}selected{% endif %}>Abril</option>
+                    <option value="5" {% if default_month == 5 %}selected{% endif %}>Mayo</option>
+                    <option value="6" {% if default_month == 6 %}selected{% endif %}>Junio</option>
+                    <option value="7" {% if default_month == 7 %}selected{% endif %}>Julio</option>
+                    <option value="8" {% if default_month == 8 %}selected{% endif %}>Agosto</option>
+                    <option value="9" {% if default_month == 9 %}selected{% endif %}>Septiembre</option>
+                    <option value="10" {% if default_month == 10 %}selected{% endif %}>Octubre</option>
+                    <option value="11" {% if default_month == 11 %}selected{% endif %}>Noviembre</option>
+                    <option value="12" {% if default_month == 12 %}selected{% endif %}>Diciembre</option>
+                </select>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="year">Año:</label>
+                <input type="number" id="year" name="year" class="form-control" value="{{ default_year }}" required min="2024">
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-3">Generar Reporte</button>
+        </form>
+    </section>
+
+    <section class="card p-4 shadow-sm mt-4">
+        <h3>Resultados del Reporte</h3>
+        <div id="report-results">
+            <p>Selecciona un mes y año y presiona "Generar Reporte".</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
