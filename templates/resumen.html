@@ -8,12 +8,12 @@
 
     <section class="card p-4 shadow-sm mb-4">
         <h3>Selecciona el Día</h3>
-        <label>Fecha del Resumen:
-            <input type="date" name="fecha" id="summary_fecha" 
-                   value="{{ today_date }}" class="form-control">
-        </label>
+        
+        <label for="summary_fecha">Fecha del Resumen:</label>
+        <input type="date" name="fecha" id="summary_fecha" value="{{ today_date }}" class="form-control" required>
         
         <div id="summary-results" class="mt-4">
+            <!-- El contenido inicial será cargado por JavaScript al cargar la página -->
             Cargando resumen...
         </div>
     </section>
