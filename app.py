@@ -527,11 +527,29 @@ def summary_page():
     
     today_date = date.today().isoformat()
     
-    # CORRECCIÓN CLAVE: Renderizar "resumen.html"
+    # Renderizar "resumen.html"
     return render_template("resumen.html", 
                            email=session.get('email'),
                            today_date=today_date)
 # FIN DE RUTA CORREGIDA
+
+# RUTA NUEVA: Reporte Mensual (UI)
+@app.route("/reporte_mensual")
+def monthly_report_page():
+    if not session.get('email'):
+        return redirect(url_for("login"))
+    
+    # Obtener el mes y año actual como valores predeterminados
+    today = date.today()
+    default_month = today.month
+    default_year = today.year
+    
+    # Renderizar la nueva plantilla de formulario
+    return render_template("monthly_report.html", 
+                           email=session.get('email'),
+                           default_month=default_month,
+                           default_year=default_year)
+# FIN DE RUTA NUEVA
 
 # ----------------------------
 # API: Trips (Ruta Unificada)
