@@ -20,13 +20,15 @@
   </header>
 
   {% if session.get('email') %}
-  <nav class="main-nav">
-    <a href="{{ url_for('index') }}" class="nav-link">Inicio</a>
-    <a href="{{ url_for('viajes_page') }}" class="nav-link">Registrar Viajes</a>
-    <a href="{{ url_for('extras_page') }}" class="nav-link">Viajes Extra</a>
-    <a href="{{ url_for('gastos_page') }}" class="nav-link">Registrar Gastos</a>
-    <a href="{{ url_for('presupuesto_page') }}" class="nav-link">Presupuesto</a>
-    <a href="{{ url_for('api_monthly_report') }}" class="nav-link">Resúmenes</a>
+  <nav class="main-nav-buttons">
+    <div class="nav-button-container">
+        <a href="{{ url_for('index') }}" class="nav-btn btn-home">Inicio</a>
+        <a href="{{ url_for('viajes_page') }}" class="nav-btn btn-viajes">Registrar Viajes</a>
+        <a href="{{ url_for('extras_page') }}" class="nav-btn btn-extras">Viajes Extra</a>
+        <a href="{{ url_for('gastos_page') }}" class="nav-btn btn-gastos">Registrar Gastos</a>
+        <a href="{{ url_for('presupuesto_page') }}" class="nav-btn btn-presupuesto">Presupuesto</a>
+        <a href="{{ url_for('api_monthly_report') }}" class="nav-btn btn-resumenes">Resúmenes</a>
+    </div>
   </nav>
   {% endif %}
   <main class="container">
