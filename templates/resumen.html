@@ -4,15 +4,19 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4">🔍 Resumen de Productividad</h2>
+    <h2 class="mb-4">🔍 Resumen de Productividad Diaria</h2>
 
-    <label>Fecha del Resumen:
-        <input type="date" name="fecha" id="summary_fecha" class="form-control" 
-               value="{{ (datetime.utcnow().date()).isoformat() }}">
-    </label>
-
-    <div id="summary-results" class="mt-4">
-        Cargando resumen...
-    </div>
+    <section class="card p-4 shadow-sm mb-4">
+        <h3>Selecciona el Día</h3>
+        <label>Fecha del Resumen:
+            <input type="date" name="fecha" id="summary_fecha" 
+                   value="{{ today_date }}" class="form-control">
+        </label>
+        
+        <div id="summary-results" class="mt-4">
+            Cargando resumen...
+        </div>
+    </section>
 </div>
+
 {% endblock %}
