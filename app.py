@@ -501,7 +501,7 @@ def gastos_page():
     # Pasamos el objeto datetime para poder formatear la hora en la plantilla HTML si es necesario
     now = datetime.now() 
     
-    return render_template("expenses.html", 
+    return render_template("gastos.html", 
                            email=session.get('email'),
                            today_date=today_date,
                            now=now)
