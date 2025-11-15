@@ -119,6 +119,10 @@ body{
     background-color: #17a2b8; /* Cyan/Info */
 }
 
+.btn-kilometraje {
+    background-color: #f7941d; /* Naranja/Kilometraje */
+}
+
 .btn-resumenes {
     background-color: #6c757d; /* Gris/Secundario */
 }
