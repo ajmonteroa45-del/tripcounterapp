@@ -16,32 +16,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // 1. Inicializar todas las páginas solo si el elemento clave existe.
     if (document.getElementById('trip-form')) initializeTripsPage();
     if (document.getElementById('expense-form')) initializeExpensesPage();
-    
-    // CORRECCIÓN CRÍTICA DE PRESUPUESTO: Llamamos a la función SOLO si el formulario principal existe
     if (document.getElementById('add-presupuesto-form')) initializeBudgetPage();
-    
     if (document.getElementById('km-state-container')) initializeKilometrajePage(); 
     if (document.getElementById('extra-form')) initializeExtrasPage();
     if (document.getElementById('summary_fecha')) initializeSummaryPage(); 
-    if (document.getElementById('reportForm')) initializeReportPage(); // <--- Ahora se llama aquí
+    if (document.getElementById('reportForm')) initializeReportPage();
     
     // 2. Inicializar recordatorios de la Home
     if (document.querySelector('.mark-paid-btn')) initializeHomeReminders(); 
 
-    // 3. Escucha global de cambio de fecha (si el input existe)
-    const fechaInput = document.getElementById('fecha'); // Usado por Viajes y Gastos
+    // 3. Escucha global de cambio de fecha (Solo para Gastos, Extras, Kilometraje y Resúmenes Diarios)
+    // NOTA: La lógica de Viajes se maneja ahora *dentro* de initializeTripsPage.
+    
     const fechaExtraInput = document.getElementById('fecha_extra'); 
     const fechaKmInput = document.getElementById('fecha_km'); 
     const fechaSummaryInput = document.getElementById('summary_fecha');
-    
-    // Listener para Viajes y Gastos
-    if (fechaInput) {
-        fechaInput.addEventListener('change', () => {
-            if (document.getElementById('trip-form')) fetchAndDisplayTrips(fechaInput.value);
-            if (document.getElementById('expense-form')) fetchAndDisplayExpenses(fechaInput.value);
+    const fechaGastoInput = document.getElementById('fecha_gasto'); // Usamos un ID específico para Gastos si existe
+
+    // Listener para Gastos (Si usa un ID diferente)
+    if (fechaGastoInput) {
+        fechaGastoInput.addEventListener('change', () => {
+            if (document.getElementById('expense-form')) fetchAndDisplayExpenses(fechaGastoInput.value);
         });
     }
-    
+
     // Listener para Extras
     if (fechaExtraInput) {
          fechaExtraInput.addEventListener('change', () => {
@@ -66,14 +64,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // =========================================================
-// LÓGICA DE VIAJES (TRIPS)
+// LÓGICA DE VIAJES (TRIPS) - AHORA AUTÓNOMA
 // =========================================================
 
 function initializeTripsPage() {
     const tripForm = document.getElementById('trip-form');
     const tripsListDiv = document.getElementById('trips-list');
+    const fechaInput = document.getElementById('fecha_viaje'); // <-- Usamos ID ÚNICO
+
+    if (!tripForm || !tripsListDiv || !fechaInput) return;
     
-    // Función de renderizado (GET)
+    // Función de renderizado (GET) - Ahora LOCAL
     async function fetchAndDisplayTrips(date) {
         if (tripsListDiv) tripsListDiv.innerHTML = 'Cargando viajes...';
         try {
@@ -155,12 +156,17 @@ function initializeTripsPage() {
         }
     }
 
+    // ** LÓGICA CLAVE: Listener del cambio de fecha **
+    fechaInput.addEventListener('change', (e) => {
+        fetchAndDisplayTrips(e.target.value);
+    });
+
     // Manejar el envío del formulario (POST)
     tripForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const data = {
-            fecha: tripForm.fecha.value,
+            fecha: fechaInput.value, // Usar el valor del input local
             hora_inicio: tripForm.hora_inicio.value,
             hora_fin: tripForm.hora_fin.value,
             monto: parseFloat(tripForm.monto.value),
@@ -197,8 +203,8 @@ function initializeTripsPage() {
         }
     });
     
-    // Inicializar
-    fetchAndDisplayTrips(document.getElementById('fecha').value);
+    // Inicializar con la fecha actual
+    fetchAndDisplayTrips(fechaInput.value);
 }
 
 // =========================================================
@@ -216,6 +222,7 @@ function initializeExtrasPage() {
 
     // Función de renderizado (GET)
     async function fetchAndDisplayExtras(date) {
+        // ... (lógica de fetch/render sin cambios)
         extrasListDiv.innerHTML = 'Cargando viajes extra...';
         try {
             const response = await fetch(`/api/extras?date=${date}`, {credentials: 'include'});
@@ -321,7 +328,7 @@ function initializeExtrasPage() {
 function initializeExpensesPage() {
     const expenseForm = document.getElementById('expense-form');
     const expensesListDiv = document.getElementById('expenses-list');
-    const fechaInput = document.getElementById('fecha'); 
+    const fechaInput = document.getElementById('fecha_gasto'); // Usamos ID único para gastos
     
     if (!expenseForm || !expensesListDiv || !fechaInput) return;
 
@@ -329,6 +336,7 @@ function initializeExpensesPage() {
 
     // Función de renderizado (GET)
     async function fetchAndDisplayExpenses(date) {
+        // ... (lógica de fetch/render sin cambios)
         expensesListDiv.innerHTML = 'Cargando gastos...';
         try {
             const response = await fetch(`/api/expenses?date=${date}`, {credentials: 'include'});
@@ -391,7 +399,7 @@ function initializeExpensesPage() {
         e.preventDefault();
         
         const data = {
-            fecha: expenseForm.fecha.value,
+            fecha: expenseForm.fecha_gasto.value,
             hora: expenseForm.hora.value,
             monto: parseFloat(expenseForm.monto.value),
             categoria: expenseForm.categoria.value,
