@@ -1,60 +1,61 @@
+### 2. 📝 `templates/trips.html` (Con ID de Fecha Único)
+
+Asegúrate de que tu archivo `trips.html` utilice un ID único para el campo de fecha, como **`fecha_viaje`**, para que el JavaScript pueda apuntar a él correctamente sin conflictos.
+
+**Reemplaza el contenido de tu archivo `trips.html` con esto:**
+
+```html
 {% extends "base.html" %}
 
 {% block title %}Registrar Viajes{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
+<div class="container mt-4">
+    <h2 class="mb-4">Registrar Viajes</h2>
+    
+    <form id="trip-form" class="card p-4 shadow-sm">
+        <h3>Nuevo Viaje</h3>
         
-        <a href="{{ url_for('extras_page') }}" class="btn btn-warning mb-4">
-            Ir a Registrar Extras 🚀
-        </a>
-        <hr>
-        <h1 class="mb-4">Registrar Viajes</h1>
-        <p class="text-muted">Email actual: {{ email }}</p>
-
-        <div class="card p-4 mb-4">
-            <h3>Nuevo Viaje</h3>
-            <form id="trip-form">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="fecha" class="form-label">Fecha</label>
-                       <input type="date" id="fecha" name="fecha" class="form-control" value="{{ today_date }}" required>
-                    </div>
-                    
-                    <div class="col-md-4 mb-3">
-                        <label for="hora_inicio" class="form-label">Hora Inicio</label>
-                        <input type="time" id="hora_inicio" name="hora_inicio" class="form-control" required>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="hora_fin" class="form-label">Hora Fin</label>
-                        <input type="time" id="hora_fin" name="hora_fin" class="form-control" required>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="monto" class="form-label">Monto (S/)</label>
-                        <input type="number" step="0.01" id="monto" name="monto" class="form-control" required>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="propina" class="form-label">Propina (S/)</label>
-                        <input type="number" step="0.01" id="propina" name="propina" class="form-control" value="0">
-                    </div>
-                    <div class="col-md-4 mb-3 d-flex align-items-end">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="aeropuerto" name="aeropuerto">
-                            <label class="form-check-label" for="aeropuerto">Cargo Aeropuerto</label>
-                        </div>
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn btn-success mt-3">Registrar Viaje</button>
-            </form>
+        <div class="form-group">
+            <label for="fecha_viaje">Fecha</label>
+            <!-- ID único para que el JS lo maneje localmente -->
+            <input type="date" id="fecha_viaje" name="fecha" value="{{ today_date }}" required>
         </div>
 
+        <div class="form-group">
+            <label for="hora_inicio">Hora Inicio</label>
+            <input type="time" id="hora_inicio" name="hora_inicio" required>
+        </div>
+
+        <div class="form-group">
+            <label for="hora_fin">Hora Fin</label>
+            <input type="time" id="hora_fin" name="hora_fin" required>
+        </div>
+
+        <div class="form-group">
+            <label for="monto">Monto (S/)</label>
+            <input type="number" step="0.01" id="monto" name="monto" value="" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="propina">Propina (S/)</label>
+            <input type="number" step="0.01" id="propina" name="propina" value="0" min="0">
+        </div>
+        
+        <div class="form-group checkbox-group mt-3">
+            <input type="checkbox" id="aeropuerto" name="aeropuerto">
+            <label for="aeropuerto" style="display:inline; margin-left: 8px;">Cargo Aeropuerto</label>
+        </div>
+
+        <button type="submit" class="btn mt-4">Registrar Viaje</button>
+    </form>
+    
+    <div class="mt-5">
         <h2>Viajes del Día y Resumen</h2>
         <div id="trips-list">
-            <p class="text-info">Cargando viajes y resumen del día...</p>
+            <!-- Aquí se cargará la tabla y el resumen -->
+            <p>Cargando viajes...</p>
         </div>
     </div>
+</div>
 {% endblock %}
